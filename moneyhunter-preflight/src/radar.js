@@ -7,7 +7,8 @@ import { discoverMya } from './sources/mya.js';
 import { discoverBasedAgents } from './sources/basedagents.js';
 import { discoverTaskBounty } from './sources/taskbounty.js';
 import { opportunityKey } from './opportunity.js';
-import { buildStrategyPlan, improvementProposals, enrichEconomics } from './strategy.js';
+import { buildStrategyPlan, improvementProposals, enrichEconomics, setSourcePriors } from './strategy.js';
+import { getSourcePriors } from './revenue-memory.js';
 
 const SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty'];
 const CACHE_TTL_MS=Number(process.env.RADAR_CACHE_TTL_MS||60000),cache=new Map();
@@ -22,7 +23,7 @@ export function clearRadarCache(){cache.clear();}
 export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=true}={}){
  const params={sources:[...new Set(sources)].filter(s=>SOURCES.includes(s)),minReward:Math.max(0,Number(minReward)||0),limit:Math.min(100,Math.max(1,Number(limit)||25))};
  const key=cacheKey(params),cached=cache.get(key);if(useCache&&cached&&Date.now()-cached.at<CACHE_TTL_MS)return{...cached.value,cached:true};
- const jobs=[];
+ const priors=await getSourcePriors(); setSourcePriors(priors);\n const jobs=[];
  if(params.sources.includes('frantic'))jobs.push(safe('frantic',()=>discoverFrantic({limit:params.limit})));
  if(params.sources.includes('github'))jobs.push(safe('github',()=>discoverGitHubPaid({limit:params.limit})));
  if(params.sources.includes('algora'))jobs.push(safe('algora',()=>discoverAlgora({limit:params.limit})));
