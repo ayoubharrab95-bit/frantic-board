@@ -12,6 +12,8 @@ import {
   combineScores,
   chooseRecommendation
 } from './scoring.js';
+import { estimateAcceptanceProbability, estimateExpectedValue } from './economics.js';
+import { canonicalOpportunityKey } from './dedupe.js';
 
 export function analyzeContext(context) {
   const { issue, repository, comments, linkedPrs, owner, repo, issueNumber } = context;
@@ -50,6 +52,20 @@ export function analyzeContext(context) {
     redFlags.push('AI/automation policy is not explicit; verify before submitting.');
   }
 
+  const acceptanceProbability = estimateAcceptanceProbability({
+    payment: payment.score,
+    competition: competitionScore,
+    clarity: clarity.score,
+    ai_fit: aiPolicy.score,
+    freshness: freshnessScore
+  });
+  const economics = estimateExpectedValue({
+    rewardAmount: reward.amount,
+    acceptanceProbability,
+    estimatedMinutes: 60,
+    requiredSpend: 0
+  });
+
   const recommendation = chooseRecommendation({
     issueState: issue.state,
     archived: repository.archived,
@@ -62,6 +78,9 @@ export function analyzeContext(context) {
   return {
     version: '0.1.0',
     analyzed_at: new Date().toISOString(),
+    opportunity_key: canonicalOpportunityKey({
+      platform: 'github', repository: `${owner}/${repo}`, issue_number: issueNumber, issue_url: issue.html_url
+    }),
     source: {
       platform: 'github',
       repository: `${owner}/${repo}`,
@@ -103,6 +122,7 @@ export function analyzeContext(context) {
       priority: total
     },
     recommendation,
+    economics,
     red_flags: redFlags,
     next_action:
       recommendation === 'GO'
