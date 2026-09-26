@@ -22,7 +22,7 @@ function paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PA
           input: { issue_url: 'https://github.com/owner/repo/issues/123' },
           inputSchema: {
             properties: {
-              issue_url: { type: 'string', format: 'uri', description: 'Public GitHub issue URL' }
+              issue_url: { type: 'string', description: 'Public GitHub issue URL' }
             },
             required: ['issue_url']
           },
@@ -91,7 +91,7 @@ function paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PA
           input: { issue_url: 'https://github.com/owner/repo/issues/123' },
           inputSchema: {
             properties: {
-              issue_url: { type: 'string', format: 'uri' }
+              issue_url: { type: 'string' }
             },
             required: ['issue_url']
           },
@@ -208,7 +208,7 @@ export function createApp(config = {}) {
       openapi: '3.1.0',
       info: {
         title: 'MoneyHunter x402 API',
-        version: '0.4.0',
+        version: '0.5.1',
         description: 'Paid-opportunity discovery and bounty preflight for AI agents.'
       },
       servers: [{ url: publicBase }],
@@ -249,7 +249,7 @@ export function createApp(config = {}) {
 
   app.get('/', (_req, res) => res.json({
     name: 'MoneyHunter x402 Gateway',
-    version: '0.3.0',
+    version: '0.5.1',
     network: NETWORK,
     origin: ORIGIN_URL,
     prices: {
