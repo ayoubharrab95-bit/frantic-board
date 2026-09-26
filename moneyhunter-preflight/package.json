@@ -1,14 +1,16 @@
 {
-  "name": "bounty-preflight",
-  "version": "0.1.0",
+  "name": "moneyhunter-preflight",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
-  "description": "Preflight paid GitHub bounties before an AI agent spends compute.",
+  "description": "Preflight and rank paid AI-agent opportunities before compute is spent.",
   "scripts": {
     "start": "node src/server.js",
     "mcp": "node src/mcp.js",
+    "radar": "node src/radar-cli.js",
+    "preflight": "node src/cli.js",
     "test": "node --test",
-    "check": "node --check src/*.js"
+    "check": "node --check src/*.js src/sources/*.js"
   },
   "engines": {
     "node": ">=20"
