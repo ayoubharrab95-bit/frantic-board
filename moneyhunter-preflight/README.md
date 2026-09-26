@@ -12,7 +12,7 @@ The goal is simple:
 
 MoneyHunter does **not** promise payment, acceptance, or daily income. It reduces wasted compute and bad claims.
 
-## v0.3 capabilities
+## v0.4 capabilities
 
 ### 1. GitHub bounty preflight
 
@@ -135,23 +135,25 @@ npm run mcp
 
 ## Monetization
 
-Launch draft prices:
+Production x402 prices on **Base mainnet (eip155:8453)**:
 
 - bounty preflight: **$0.05 / call**
 - opportunity radar: **$0.10 / call**
 - payment reliability: **$0.03 / call**
 
-The `deploy/x402-proxy/` directory contains the current x402 v2 paid gateway using `@x402/core`, `@x402/evm`, and `@x402/hono`.
+Production paid gateway: `https://moneyhunter-x402-gateway.onrender.com`\n\nThe active Node gateway uses `@x402/core`, `@x402/evm`, and the official Express adapter. It settles USDC through x402 v2 on Base mainnet.
 
-Safe launch order:
+Production status:
 
 1. free origin API live on Render ✅
-2. Base Sepolia x402 gateway configured
-3. add only the public EVM receiving address
-4. test 402 challenge with test USDC
-5. verify settlement receipt
-6. switch the gateway from `eip155:84532` to Base mainnet `eip155:8453`
-7. list/distribute the paid API/MCP in suitable agent directories
+2. Base Sepolia 402 challenge tested ✅
+3. test-USDC signature and settlement completed end-to-end ✅
+4. receiving EVM address configured ✅
+5. production gateway switched to Base mainnet `eip155:8453` ✅
+6. browser test-payment route disabled on mainnet ✅
+7. paid API discovery metadata published ✅
+
+The remaining growth work is distribution: getting the live paid API/MCP in front of more agents and continuing external paid-work hunting.
 
 No private key or seed phrase is required for receiving API payments.
 
