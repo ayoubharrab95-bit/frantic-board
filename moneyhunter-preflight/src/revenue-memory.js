@@ -82,3 +82,22 @@ export async function revenueMemorySummary(){
   const ledger=await readLedger();
   return {entries:ledger.length,by_source:summarizeLedger(ledger),source_priors:await getSourcePriors(),last_updated:ledger.at(-1)?.timestamp||null};
 }
+
+export async function enqueueOpportunity(opportunity){
+  const ledger=await readLedger();
+  const id=String(opportunity.opportunity_id||opportunity.id||'');
+  if(!id) throw new Error('opportunity_id is required');
+  const existing=ledger.find(x=>x.opportunity_id===id && x.record_type==='execution');
+  if(existing) return existing;
+  const row={record_type:'execution',id:`exec-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,opportunity_id:id,source:String(opportunity.source||'unknown'),reward_usd:Number(opportunity.reward||0),status:'discovered',ai_allowed:opportunity.ai_policy!=='prohibited',title:String(opportunity.title||''),url:String(opportunity.url||''),created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  ledger.push(row); await writeJson(LEDGER,ledger.slice(-5000)); return row;
+}
+export async function updateExecution(id, patch={}){
+  const ledger=await readLedger(); const row=ledger.find(x=>x.id===id || x.opportunity_id===id && x.record_type==='execution');
+  if(!row) throw new Error('execution_not_found');
+  Object.assign(row,patch,{updated_at:new Date().toISOString()}); await writeJson(LEDGER,ledger.slice(-5000));
+  return row;
+}
+export function executionQueue(ledger=[]){
+  return ledger.filter(x=>x.record_type==='execution' && !['paid','rejected','abandoned'].includes(x.status)).sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+}
