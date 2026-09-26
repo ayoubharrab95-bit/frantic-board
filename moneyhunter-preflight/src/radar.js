@@ -8,7 +8,7 @@ import { discoverBasedAgents } from './sources/basedagents.js';
 import { discoverTaskBounty } from './sources/taskbounty.js';
 import { opportunityKey } from './opportunity.js';
 import { buildStrategyPlan, improvementProposals, enrichEconomics, setSourcePriors } from './strategy.js';
-import { getSourcePriors } from './revenue-memory.js';
+import { getSourcePriors, enqueueOpportunity } from './revenue-memory.js';
 
 const SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty'];
 const CACHE_TTL_MS=Number(process.env.RADAR_CACHE_TTL_MS||60000),cache=new Map();
@@ -40,6 +40,6 @@ export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=tr
   return{...i,expected_value_usd:Number(ev.toFixed(2)),radar_score:Number((ev*Math.max(.25,payment)*Math.max(.25,competition)).toFixed(2)),payment_confidence:Number(payment.toFixed(2)),competition_score:Number(competition.toFixed(2)),economics:enrichEconomics({...i,payment_confidence:payment,competition_score:competition})};
  }).filter(i=>i.expected_value_usd>0).sort((a,b)=>b.economics.expected_hourly_usd-a.economics.expected_hourly_usd||b.radar_score-a.radar_score||b.expected_value_usd-a.expected_value_usd).slice(0,params.limit);
  const sourceStatus=Object.fromEntries(batches.map(b=>[b.label,b.error?{ok:false,error:b.error}:{ok:true,found:b.items.length}])),strategy=buildStrategyPlan({opportunities,sourceStatus});
- const value={generated_at:new Date().toISOString(),strategy_revision:strategy.strategy_revision,requested_sources:params.sources,source_status:sourceStatus,count:opportunities.length,opportunities,strategy,improvement_proposals:improvementProposals({sourceStatus,opportunities}),cached:false};
+ if(process.env.AUTO_QUEUE_OPPORTUNITIES==='true'){for(const item of strategy.portfolio){try{await enqueueOpportunity(item)}catch{}}}\n const value={generated_at:new Date().toISOString(),strategy_revision:strategy.strategy_revision,requested_sources:params.sources,source_status:sourceStatus,count:opportunities.length,opportunities,strategy,improvement_proposals:improvementProposals({sourceStatus,opportunities}),cached:false};
  cache.set(key,{at:Date.now(),value});return value;
 }
