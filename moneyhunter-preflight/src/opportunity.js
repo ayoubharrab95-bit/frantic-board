@@ -10,6 +10,9 @@ export function makeOpportunity(input) {
     available_slots: input.available_slots ?? null,
     active_claims: input.active_claims ?? null,
     ai_policy: input.ai_policy || 'unknown',
+    payment_confidence: input.payment_confidence ?? null,
+    competition_score: input.competition_score ?? null,
+    requires_manual_payment: input.requires_manual_payment ?? null,
     raw: input.raw || {}
   };
 }
