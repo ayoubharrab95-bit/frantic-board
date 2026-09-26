@@ -100,7 +100,15 @@ export function createApp(config = {}) {
   app.disable('x-powered-by');
   app.use(express.json({ limit: '64kb' }));
 
-  app.get('/test-payment', (_req, res) => res.type('html').send(testPage()));
+  app.get('/test-payment', (_req, res) => {
+    if (NETWORK !== 'eip155:84532') {
+      return res.status(404).json({
+        error: 'test_payment_disabled',
+        detail: 'The browser test page is available only on Base Sepolia.'
+      });
+    }
+    return res.type('html').send(testPage());
+  });
 
   app.get('/', (_req, res) => res.json({
     name: 'MoneyHunter x402 Gateway',
@@ -120,7 +128,9 @@ export function createApp(config = {}) {
     adapter: 'express',
     network: NETWORK,
     origin: ORIGIN_URL,
-    pay_to_configured: isEvmAddress(PAY_TO)
+    pay_to_configured: isEvmAddress(PAY_TO),
+    facilitator: FACILITATOR_URL,
+    production: NETWORK === 'eip155:8453'
   }));
 
   if (isEvmAddress(PAY_TO)) {
