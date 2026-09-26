@@ -2,6 +2,7 @@ import http from 'node:http';
 import { analyzeIssueUrl } from './analyze.js';
 import { runRadar } from './radar.js';
 import { revenueChannels, buildRevenuePortfolio } from './channels.js';
+import { revenueLanes, buildRevenuePlan } from './revenue-engine.js';
 import { PRICING, PUBLIC_MANIFEST, LLMS_TEXT, OPENAPI } from './product.js';
 import { revenueOffers } from './offers.js';
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
@@ -15,11 +16,12 @@ const server=http.createServer(async(req,res)=>{
  observeRequest();
  if(req.method==='OPTIONS')return json(res,204,{});
  if(req.method==='GET'&&req.url==='/')return json(res,200,PUBLIC_MANIFEST);
- if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,service:'moneyhunter-preflight',version:'0.5.1',features:PUBLIC_MANIFEST.features});
+ if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,service:'moneyhunter-preflight',version:PUBLIC_MANIFEST.version,features:PUBLIC_MANIFEST.features});
  if(req.method==='GET'&&req.url==='/llms.txt')return text(res,200,LLMS_TEXT);
  if(req.method==='GET'&&req.url==='/openapi.json')return json(res,200,OPENAPI);
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
+ if(req.method==='GET'&&req.url==='/v1/revenue-plan')return json(res,200,{generated_at:new Date().toISOString(),lanes:revenueLanes(),plan:buildRevenuePlan()},{'cache-control':'public, max-age=120'});
  if(req.method==='GET'&&req.url==='/v1/offers')return json(res,200,{generated_at:new Date().toISOString(),offers:revenueOffers()},{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/metrics')return json(res,200,snapshotMetrics(),{'cache-control':'no-store'});
  if(req.method==='POST'&&req.url==='/v1/preflight'){const started=Date.now();try{const p=await readJson(req);if(!p.issue_url){observePreflight({ok:false,latencyMs:Date.now()-started});return json(res,400,{error:'issue_url is required'})}const r=await analyzeIssueUrl(p.issue_url);observePreflight({ok:true,latencyMs:Date.now()-started});return json(res,200,r)}catch(e){observePreflight({ok:false,latencyMs:Date.now()-started});return json(res,422,{error:e instanceof Error?e.message:String(e)})}}
