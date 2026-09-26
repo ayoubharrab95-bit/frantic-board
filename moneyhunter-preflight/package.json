@@ -1,16 +1,18 @@
 {
   "name": "moneyhunter-preflight",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "type": "module",
-  "description": "Preflight and rank paid AI-agent opportunities before compute is spent.",
+  "description": "Preflight, rank, and monetize paid AI-agent opportunities before compute is spent.",
   "scripts": {
     "start": "node src/server.js",
     "mcp": "node src/mcp.js",
     "radar": "node src/radar-cli.js",
     "preflight": "node src/cli.js",
     "test": "node --test",
-    "check": "node --check src/*.js src/sources/*.js"
+    "check": "node --check src/*.js src/sources/*.js",
+    "verify": "npm run check && npm test",
+    "postinstall": "npm run verify"
   },
   "engines": {
     "node": ">=20"
