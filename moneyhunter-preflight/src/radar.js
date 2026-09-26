@@ -2,6 +2,8 @@ import { discoverFrantic } from './sources/frantic.js';
 import { discoverGitHubPaid } from './sources/github-paid.js';
 import { discoverAlgora } from './sources/algora.js';
 import { discoverOpire } from './sources/opire.js';
+import { discoverClawlancer } from './sources/clawlancer.js';
+import { discoverMya } from './sources/mya.js';
 import { opportunityKey } from './opportunity.js';
 import { buildStrategyPlan, improvementProposals, enrichEconomics } from './strategy.js';
 
@@ -14,7 +16,7 @@ function expectedValue(i){const reward=Math.max(0,Number(i.reward)||0),payment=n
 async function safe(label,fn){try{return{label,items:await fn(),error:null}}catch(error){return{label,items:[],error:error instanceof Error?error.message:String(error)}}}
 function cacheKey({sources,minReward,limit}){return JSON.stringify({sources:[...sources].sort(),minReward,limit});}
 export function clearRadarCache(){cache.clear();}
-export async function runRadar({sources=['frantic','github','algora','opire'],minReward=5,limit=25,useCache=true}={}){
+export async function runRadar({sources=['frantic','github','algora','opire','clawlancer','mya'],minReward=5,limit=25,useCache=true}={}){
  const params={sources:[...new Set(sources)].filter(s=>['frantic','github','algora','opire'].includes(s)),minReward:Math.max(0,Number(minReward)||0),limit:Math.min(100,Math.max(1,Number(limit)||25))};
  const key=cacheKey(params),cached=cache.get(key);if(useCache&&cached&&Date.now()-cached.at<CACHE_TTL_MS)return{...cached.value,cached:true};
  const jobs=[];
@@ -22,6 +24,8 @@ export async function runRadar({sources=['frantic','github','algora','opire'],mi
  if(params.sources.includes('github'))jobs.push(safe('github',()=>discoverGitHubPaid({limit:params.limit})));
  if(params.sources.includes('algora'))jobs.push(safe('algora',()=>discoverAlgora({limit:params.limit})));
  if(params.sources.includes('opire'))jobs.push(safe('opire',()=>discoverOpire({limit:params.limit})));
+ if(params.sources.includes('clawlancer'))jobs.push(safe('clawlancer',()=>discoverClawlancer({limit:params.limit})));
+ if(params.sources.includes('mya'))jobs.push(safe('mya',()=>discoverMya({limit:params.limit})));
  const batches=await Promise.all(jobs),found=batches.flatMap(b=>b.items),seen=new Set(),deduped=[];
  for(const item of found){const k=opportunityKey(item);if(seen.has(k))continue;seen.add(k);deduped.push(item);}
  const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward).map(i=>{
