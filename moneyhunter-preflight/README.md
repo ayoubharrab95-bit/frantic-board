@@ -1,24 +1,45 @@
-# Bounty Preflight
+# MoneyHunter Bounty Preflight
 
-A small API + MCP tool that answers one question before an AI coding agent spends compute:
+MoneyHunter is a small **zero-LLM-first opportunity radar + bounty preflight API + MCP server**.
 
-> **Is this paid GitHub opportunity actually worth attempting?**
+The goal is simple:
 
-It checks the live GitHub source of truth instead of trusting bounty mirrors.
+> Find paid work that is real, current, AI-compatible, low-competition, and worth spending agent compute on.
 
-## What v0.1 checks
+The project does **not** promise payment or acceptance. It reduces wasted compute and bad claims.
 
-- issue is still open
-- repository is alive / not archived
-- reward amount and payout currency signals
-- funded/escrowed vs proposed/unfunded/honeypot language
-- explicit AI-agent permission or prohibition
+## v0.2 capabilities
+
+### GitHub bounty preflight
+
+Checks:
+
+- issue still open
+- repository alive / not archived
+- reward amount / currency signals
+- funded / escrowed vs proposed / unfunded / honeypot wording
+- explicit AI permission or prohibition
 - issue comments, assignment, claim signals and linked open PRs
 - acceptance criteria, verification instructions and deliverable clarity
 - repository freshness
-- a weighted priority score and `GO`, `REVIEW`, or `SKIP` recommendation
+- weighted `GO`, `REVIEW`, or `SKIP`
 
-The score is a triage heuristic, **not a guarantee of payment or acceptance**.
+### Opportunity radar
+
+The radar discovers live opportunities from supported sources without invoking an LLM.
+
+Current source:
+
+- Frantic public bounty board
+
+Next adapters:
+
+- Algora
+- Opire
+- GitHub paid-issue search
+- direct-hire intake
+
+The internal model is source-neutral so new adapters can be added without rewriting ranking logic.
 
 ## HTTP API
 
@@ -26,7 +47,6 @@ Node.js 20+:
 
 ```bash
 npm install
-cp .env.example .env
 npm start
 ```
 
@@ -36,7 +56,7 @@ Health:
 curl http://localhost:8787/health
 ```
 
-Analyze a bounty:
+Analyze one GitHub bounty:
 
 ```bash
 curl -X POST http://localhost:8787/v1/preflight \
@@ -44,46 +64,79 @@ curl -X POST http://localhost:8787/v1/preflight \
   -d '{"issue_url":"https://github.com/OWNER/REPO/issues/123"}'
 ```
 
-For reliable GitHub API limits, set `GITHUB_TOKEN` in the environment. Never commit the token.
+Find opportunities:
+
+```bash
+curl 'http://localhost:8787/v1/radar?min_reward=5&limit=25'
+```
+
+For higher GitHub API limits, set `GITHUB_TOKEN` in the environment. Never commit it.
 
 ## CLI
 
 ```bash
-node src/cli.js https://github.com/OWNER/REPO/issues/123
+npm run preflight -- https://github.com/OWNER/REPO/issues/123
+npm run radar -- 5
 ```
 
 ## MCP
 
-Uses the current v2 MCP TypeScript server package.
+The project uses the stable v2 `@modelcontextprotocol/server` package.
 
 ```bash
 npm install
 npm run mcp
 ```
 
-It exposes:
+Tools:
 
 - `preflight_github_bounty({ issue_url })`
+- `find_paid_opportunities({ min_reward, limit })`
 
-## Safety / anti-spam rules
+## Monetization scaffold
 
-Hard stop signals include:
+Launch pricing is stored in `product/pricing.json`.
 
-- AI-generated submissions explicitly prohibited
-- proposed or unfunded rewards
-- honeypot/bait language
-- archived or closed work
-- heavy claim/PR competition
+Current draft prices:
 
-A `GO` still means: verify platform-specific claim rules before an irreversible action or before spending the operator's funds.
+- bounty preflight: **$0.05 / call**
+- opportunity radar: **$0.10 / call**
+- payment reliability: **$0.03 / call**
 
-## Roadmap
+The `deploy/x402-proxy/` folder contains a Cloudflare Worker scaffold for an x402 pay-per-call gateway.
 
-- Frantic adapter
-- Algora adapter
-- Opire adapter
-- payout-history / settlement reliability scoring
-- cross-platform deduplication
-- cached zero-LLM radar
-- x402 pay-per-call endpoint for third-party agents
-- autonomous hunter integration: discover → preflight → claim → execute → verify → submit → settlement watch
+Safe deployment order:
+
+1. deploy the free origin API
+2. use `base-sepolia`
+3. set only a public EVM receiving address
+4. test with test USDC
+5. verify settlement
+6. switch to `base` only after successful tests
+
+Never put a private key or recovery phrase in this repository.
+
+## Hard-stop rules
+
+Do not spend agent compute when:
+
+- AI-generated submissions are explicitly prohibited
+- reward is proposed/unfunded
+- honeypot/bait language is present
+- repository or issue is closed/archived
+- competition is excessive
+- payment credibility is poor
+- the task requires unauthorized security testing
+
+A `GO` still means platform-specific claim rules must be checked before any irreversible action or spending.
+
+## Revenue-engine direction
+
+MoneyHunter is intended to support four lanes:
+
+1. funded external bounties
+2. direct-hire agent work
+3. paid API/MCP calls
+4. marketplace/distribution integrations
+
+External paid work has priority. When no strong opportunity exists, development effort improves the owned revenue asset instead of idling.
