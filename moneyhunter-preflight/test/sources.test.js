@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAlgoraOrg, discoverAlgora } from '../src/sources/algora.js';
 import { parseOpireHome } from '../src/sources/opire.js';
+import { parseClawlancerRows } from '../src/sources/clawlancer.js';
+import { parseMyaJobs } from '../src/sources/mya.js';
+import { parseBasedAgentsTasks } from '../src/sources/basedagents.js';
 
 test('parses Algora bounty rows and claim counts', () => {
   const html = '<main>Open 2 $100 nuclei#6674 Replace panic with error handling 33 claims $20 highlight#8032 document backend instrumentation 26 claims</main>';
@@ -20,6 +23,13 @@ test('parses Opire visible reward cards conservatively', () => {
   assert.equal(rows[0].active_claims, 6);
   assert.equal(rows[0].requires_manual_payment, true);
   assert.equal(rows[0].status, 'unverified');
+});
+
+test('parses agent-native marketplace sources',()=>{
+  const c=parseClawlancerRows([{id:'1',title:'Fix API',reward:5000000,status:'open'}]);
+  const m=parseMyaJobs([{id:'2',title:'Research',reward:'$25 USDC',status:'open'}]);
+  const b=parseBasedAgentsTasks([{id:'3',title:'Build tool',bounty:{amount_display:'10.00'},payment_status:'funded',claimable:true}]);
+  assert.equal(c[0].reward,5); assert.equal(m[0].reward,25); assert.equal(b[0].reward,10); assert.equal(b[0].status,'open');
 });
 
 test('Algora scans concurrently and keeps useful results when one organization fails', async () => {
