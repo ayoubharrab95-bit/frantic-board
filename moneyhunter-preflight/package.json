@@ -1,6 +1,6 @@
 {
   "name": "moneyhunter-preflight",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": false,
   "type": "module",
   "description": "Preflight, rank, and monetize paid AI-agent opportunities before compute is spent.",
@@ -9,7 +9,7 @@
     "mcp": "node src/mcp.js",
     "radar": "node src/radar-cli.js",
     "preflight": "node src/cli.js",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "check": "node --check src/*.js src/sources/*.js",
     "verify": "npm run check && npm test",
     "postinstall": "npm run verify"
