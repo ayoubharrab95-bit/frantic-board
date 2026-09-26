@@ -7,8 +7,10 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "hono": "^4.0.0",
-    "x402-hono": "^2.0.0"
+    "@x402/core": "^2.22.0",
+    "@x402/evm": "^2.22.0",
+    "@x402/hono": "^2.22.0",
+    "hono": "^4.0.0"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
