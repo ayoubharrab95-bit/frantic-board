@@ -1,6 +1,6 @@
 {
   "name": "moneyhunter-x402-node-gateway",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,10 +13,9 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.4",
-    "@x402/core": "^2.22.0",
-    "@x402/evm": "^2.22.0",
-    "@x402/hono": "^2.22.0",
-    "hono": "^4.9.7"
+    "@x402/core": "^2.26.0",
+    "@x402/evm": "^2.26.0",
+    "@x402/express": "^2.26.0",
+    "express": "^5.1.0"
   }
 }
