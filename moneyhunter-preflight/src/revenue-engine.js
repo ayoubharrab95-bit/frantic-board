@@ -1,3 +1,4 @@
+// MoneyHunter v0.6 headless revenue portfolio
 const clamp=(n,min=0,max=1)=>Math.max(min,Math.min(max,Number(n)||0));
 
 const LANES=[
