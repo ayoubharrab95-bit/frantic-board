@@ -10,18 +10,13 @@ const CHANNELS=[
 {id:'reusable-assets',type:'product',status:'planned',automation:'high',payment:'marketplace-dependent',repeatability:'very-high',requires_spend:false,requires_auth:'varies',notes:'Turn successful internal components into reusable templates, MCP tools and small developer utilities.'},
 {id:'sponsorships-grants',type:'grant',status:'watch',automation:'low',payment:'mixed',repeatability:'low',requires_spend:false,requires_auth:'varies',notes:'Monitor legitimate open-source grants and agent-building programs; do not treat prize pools as guaranteed income.'}
 ];
-const BLOCKED_PATTERNS=[
-/private key/i,/seed phrase/i,/recovery phrase/i,/wallet signature/i,/pay gas/i,/buy .*usdc/i,/deposit/i,/kyc/i,/legal agreement/i
-];
+const BLOCKED_PATTERNS=[/private key/i,/seed phrase/i,/recovery phrase/i,/wallet signature/i,/pay gas/i,/buy .*usdc/i,/deposit/i,/kyc/i,/legal agreement/i];
 export function revenueChannels(){return CHANNELS.map(x=>({...x}));}
 export function channelPolicy(channel){
- const text=JSON.stringify(channel);
- const blocked=BLOCKED_PATTERNS.some(re=>re.test(text));
- return {auto_allowed:!blocked&&channel.requires_spend===false&&channel.requires_auth!==true,requires_human_step:blocked||channel.requires_spend!==false||channel.requires_auth===true};
+ const text=JSON.stringify(channel),blocked=BLOCKED_PATTERNS.some(re=>re.test(text));
+ return{auto_allowed:!blocked&&channel.requires_spend===false&&channel.requires_auth!==true,requires_human_step:blocked||channel.requires_spend!==false||channel.requires_auth===true};
 }
 export function buildRevenuePortfolio({minAutomation='medium'}={}){
- const rank={very-high:5,high:4,medium:3,low:2};
- return CHANNELS.map(c=>({...c,policy:channelPolicy(c)}))
-  .filter(c=>(rank[c.automation]??0)>=(rank[minAutomation]??3))
-  .sort((a,b)=>(rank[b.automation]??0)-(rank[a.automation]??0)||Number(b.repeatability==='very-high')-Number(a.repeatability==='very-high'));
+ const rank={'very-high':5,high:4,medium:3,low:2};
+ return CHANNELS.map(c=>({...c,policy:channelPolicy(c)})).filter(c=>(rank[c.automation]??0)>=(rank[minAutomation]??3)).sort((a,b)=>(rank[b.automation]??0)-(rank[a.automation]??0)||Number(b.repeatability==='very-high')-Number(a.repeatability==='very-high'));
 }
