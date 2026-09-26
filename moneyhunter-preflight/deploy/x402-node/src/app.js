@@ -192,108 +192,11 @@ export function createApp(config = {}) {
         'x-payment-info': {
           protocols: ['x402'],
           network: NETWORK,
-          price: { mode: 'fixed', currency: 'USD', amount: resource.price.replace('
-
-  app.get('/test-payment', (_req, res) => {
-    if (NETWORK !== 'eip155:84532') {
-      return res.status(404).json({
-        error: 'test_payment_disabled',
-        detail: 'The browser test page is available only on Base Sepolia.'
-      });
-    }
-    return res.type('html').send(testPage());
-  });
-
-  app.get('/', (_req, res) => res.json({
-    name: 'MoneyHunter x402 Gateway',
-    version: '0.3.0',
-    network: NETWORK,
-    origin: ORIGIN_URL,
-    prices: {
-      preflight: PRICE_PREFLIGHT,
-      radar: PRICE_RADAR,
-      payment_reliability: PRICE_PAYMENT_RELIABILITY
-    }
-  }));
-
-  app.get('/health', (_req, res) => res.json({
-    ok: true,
-    service: 'moneyhunter-x402-gateway',
-    adapter: 'express',
-    network: NETWORK,
-    origin: ORIGIN_URL,
-    pay_to_configured: isEvmAddress(PAY_TO),
-    facilitator: FACILITATOR_URL,
-    production: NETWORK === 'eip155:8453'
-  }));
-
-  if (isEvmAddress(PAY_TO)) {
-    const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
-    const resourceServer = new x402ResourceServer(facilitator)
-      .register('eip155:84532', new ExactEvmScheme())
-      .register('eip155:8453', new ExactEvmScheme())
-      .registerExtension(bazaarResourceServerExtension);
-
-    app.use(paymentMiddleware(
-      paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PAYMENT_RELIABILITY }),
-      resourceServer
-    ));
-  } else {
-    app.use('/v1', (_req, res) => res.status(503).json({
-      error: 'x402_not_configured',
-      detail: 'PAY_TO must be a valid public EVM address.'
-    }));
-  }
-
-  app.get('/v1/radar', async (req, res, next) => {
-    try {
-      const query = new URLSearchParams(req.query).toString();
-      const upstream = await fetch(`${ORIGIN_URL}/v1/radar${query ? `?${query}` : ''}`);
-      await relay(upstream, res);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post('/v1/preflight', async (req, res, next) => {
-    try {
-      const upstream = await fetch(`${ORIGIN_URL}/v1/preflight`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(req.body || {})
-      });
-      await relay(upstream, res);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post('/v1/payment-reliability', async (req, res, next) => {
-    try {
-      const upstream = await fetch(`${ORIGIN_URL}/v1/payment-reliability`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(req.body || {})
-      });
-      await relay(upstream, res);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.use((error, _req, res, _next) => {
-    console.error('gateway_error', error);
-    res.status(500).json({
-      error: 'gateway_internal_error',
-      detail: error instanceof Error ? error.message : String(error)
-    });
-  });
-
-  return app;
-}
-
-export { isEvmAddress };
-, '') }
+          price: {
+            mode: 'fixed',
+            currency: 'USD',
+            amount: resource.price.startsWith('$') ? resource.price.slice(1) : resource.price
+          }
         },
         responses: {
           '200': { description: 'Paid response' },
@@ -371,7 +274,8 @@ export { isEvmAddress };
     const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
     const resourceServer = new x402ResourceServer(facilitator)
       .register('eip155:84532', new ExactEvmScheme())
-      .register('eip155:8453', new ExactEvmScheme());
+      .register('eip155:8453', new ExactEvmScheme())
+      .registerExtension(bazaarResourceServerExtension);
 
     app.use(paymentMiddleware(
       paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PAYMENT_RELIABILITY }),
