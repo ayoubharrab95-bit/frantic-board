@@ -12,7 +12,7 @@ const headers=t=>({'content-type':t,'access-control-allow-origin':'*','access-co
 const json=(res,status,body,extra={})=>{const e=JSON.stringify(body,null,2);res.writeHead(status,{...headers('application/json; charset=utf-8'),'content-length':Buffer.byteLength(e),...extra});res.end(e)};
 const text=(res,status,body,t='text/plain; charset=utf-8')=>{res.writeHead(status,{...headers(t),'content-length':Buffer.byteLength(body)});res.end(body)};
 async function readJson(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>64000)throw new Error('Request body too large.')}return raw?JSON.parse(raw):{}}
-function parseRadarQuery(s='/'){const u=new URL(s,'http://localhost'),minReward=Number(u.searchParams.get('min_reward')||5),limit=Number(u.searchParams.get('limit')||25),sources=(u.searchParams.get('sources')||'frantic,github,algora,opire').split(',').map(x=>x.trim()).filter(Boolean);return{minReward:Number.isFinite(minReward)?Math.max(0,minReward):5,limit:Number.isFinite(limit)?Math.min(100,Math.max(1,limit)):25,sources}}
+function parseRadarQuery(s='/'){const u=new URL(s,'http://localhost'),minReward=Number(u.searchParams.get('min_reward')||5),limit=Number(u.searchParams.get('limit')||25),sources=(u.searchParams.get('sources')||'frantic,github,algora,opire,clawlancer,mya,basedagents,taskbounty').split(',').map(x=>x.trim()).filter(Boolean);return{minReward:Number.isFinite(minReward)?Math.max(0,minReward):5,limit:Number.isFinite(limit)?Math.min(100,Math.max(1,limit)):25,sources}}
 const server=http.createServer(async(req,res)=>{
  observeRequest();
  if(req.method==='OPTIONS')return json(res,204,{});
