@@ -1,67 +1,47 @@
-import { Hono } from 'hono';
-import { paymentMiddleware } from '@x402/hono';
+import express from 'express';
+import { paymentMiddleware } from '@x402/express';
 import { x402ResourceServer, HTTPFacilitatorClient } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
 
 const isEvmAddress = (value) => /^0x[a-fA-F0-9]{40}$/.test(value || '');
 
-export function createApp(config = {}) {
-  const NETWORK = config.NETWORK || process.env.NETWORK || 'eip155:84532';
-  const ORIGIN_URL =
-    config.ORIGIN_URL ||
-    process.env.ORIGIN_URL ||
-    'https://moneyhunter-preflight.onrender.com';
-  const PAY_TO = config.PAY_TO || process.env.PAY_TO || '';
-  const PRICE_PREFLIGHT =
-    config.PRICE_PREFLIGHT || process.env.PRICE_PREFLIGHT || '$0.05';
-  const PRICE_RADAR =
-    config.PRICE_RADAR || process.env.PRICE_RADAR || '$0.10';
-  const PRICE_PAYMENT_RELIABILITY =
-    config.PRICE_PAYMENT_RELIABILITY ||
-    process.env.PRICE_PAYMENT_RELIABILITY ||
-    '$0.03';
+function paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PAYMENT_RELIABILITY }) {
+  return {
+    'POST /v1/preflight': {
+      accepts: {
+        scheme: 'exact',
+        price: PRICE_PREFLIGHT,
+        network: NETWORK,
+        payTo: PAY_TO,
+        maxTimeoutSeconds: 120
+      },
+      description: 'MoneyHunter bounty preflight'
+    },
+    'GET /v1/radar': {
+      accepts: {
+        scheme: 'exact',
+        price: PRICE_RADAR,
+        network: NETWORK,
+        payTo: PAY_TO,
+        maxTimeoutSeconds: 120
+      },
+      description: 'MoneyHunter paid opportunity radar'
+    },
+    'POST /v1/payment-reliability': {
+      accepts: {
+        scheme: 'exact',
+        price: PRICE_PAYMENT_RELIABILITY,
+        network: NETWORK,
+        payTo: PAY_TO,
+        maxTimeoutSeconds: 120
+      },
+      description: 'MoneyHunter payment reliability check'
+    }
+  };
+}
 
-  const app = new Hono();
-
-  const facilitator = new HTTPFacilitatorClient({
-    url: 'https://x402.org/facilitator'
-  });
-
-  const resourceServer = new x402ResourceServer(facilitator)
-    .register('eip155:84532', new ExactEvmScheme())
-    .register('eip155:8453', new ExactEvmScheme());
-
-  function paidRoute(method, path, price, description) {
-    return async (c, next) => {
-      if (!isEvmAddress(PAY_TO)) {
-        return c.json(
-          {
-            error: 'x402_not_configured',
-            detail: 'PAY_TO must be a valid public EVM address.'
-          },
-          503
-        );
-      }
-
-      return paymentMiddleware(
-        {
-          [`${method} ${path}`]: {
-            accepts: {
-              scheme: 'exact',
-              price,
-              network: NETWORK,
-              payTo: PAY_TO
-            },
-            description
-          }
-        },
-        resourceServer
-      )(c, next);
-    };
-  }
-
-
-  app.get('/test-payment', (c) => c.html(`<!doctype html>
+function testPage() {
+  return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MoneyHunter x402 Test</title>
 <style>body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;background:#0b0b0f;color:#f2f2f2}.card{background:#15151c;border:1px solid #2b2b38;border-radius:16px;padding:24px}button{font-size:16px;padding:14px 18px;border-radius:12px;border:0;cursor:pointer}pre{white-space:pre-wrap;word-break:break-word;background:#09090d;padding:14px;border-radius:10px;min-height:120px}</style>
@@ -92,90 +72,113 @@ const pay={x402Version:2,resource:req.resource,accepted:acc,payload:{signature:s
 log('5/6 Settling…');const r2=await fetch('/v1/radar?min_reward=5&limit=1',{headers:{'PAYMENT-SIGNATURE':enc(pay)}}),txt=await r2.text();if(!r2.ok)throw new Error('Paid request failed '+r2.status+': '+txt);
 log('6/6 SUCCESS ✅');const ph=r2.headers.get('PAYMENT-RESPONSE')||r2.headers.get('payment-response');if(ph){try{log('Settlement: '+JSON.stringify(dec(ph),null,2))}catch{log('Settlement receipt received.')}}log('API response: '+txt.slice(0,1500));
 }catch(e){log('ERROR ❌ '+(e?.message||String(e)))}finally{btn.disabled=false}};
-</script></body></html>`));
+</script></body></html>`;
+}
 
-  app.get('/', (c) =>
-    c.json({
-      name: 'MoneyHunter x402 Gateway',
-      version: '0.2.0',
-      network: NETWORK,
-      origin: ORIGIN_URL,
-      prices: {
-        preflight: PRICE_PREFLIGHT,
-        radar: PRICE_RADAR,
-        payment_reliability: PRICE_PAYMENT_RELIABILITY
-      },
-      endpoints: {
-        health: '/health',
-        preflight: '/v1/preflight',
-        radar: '/v1/radar',
-        payment_reliability: '/v1/payment-reliability'
-      }
-    })
-  );
+async function relay(response, res) {
+  res.status(response.status);
+  for (const [name, value] of response.headers.entries()) {
+    const lower = name.toLowerCase();
+    if (lower === 'content-length' || lower === 'content-encoding' || lower === 'transfer-encoding') continue;
+    res.setHeader(name, value);
+  }
+  const body = Buffer.from(await response.arrayBuffer());
+  res.send(body);
+}
 
-  app.get('/health', (c) =>
-    c.json({
-      ok: true,
-      service: 'moneyhunter-x402-gateway',
-      network: NETWORK,
-      origin: ORIGIN_URL,
-      pay_to_configured: isEvmAddress(PAY_TO)
-    })
-  );
+export function createApp(config = {}) {
+  const NETWORK = config.NETWORK || process.env.NETWORK || 'eip155:84532';
+  const ORIGIN_URL = config.ORIGIN_URL || process.env.ORIGIN_URL || 'https://moneyhunter-preflight.onrender.com';
+  const PAY_TO = config.PAY_TO || process.env.PAY_TO || '';
+  const PRICE_PREFLIGHT = config.PRICE_PREFLIGHT || process.env.PRICE_PREFLIGHT || '$0.05';
+  const PRICE_RADAR = config.PRICE_RADAR || process.env.PRICE_RADAR || '$0.10';
+  const PRICE_PAYMENT_RELIABILITY = config.PRICE_PAYMENT_RELIABILITY || process.env.PRICE_PAYMENT_RELIABILITY || '$0.03';
 
-  app.use(
-    '/v1/preflight',
-    paidRoute(
-      'POST',
-      '/v1/preflight',
-      PRICE_PREFLIGHT,
-      'MoneyHunter bounty preflight'
-    )
-  );
+  const app = express();
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: '64kb' }));
 
-  app.use(
-    '/v1/radar',
-    paidRoute(
-      'GET',
-      '/v1/radar',
-      PRICE_RADAR,
-      'MoneyHunter paid opportunity radar'
-    )
-  );
+  app.get('/test-payment', (_req, res) => res.type('html').send(testPage()));
 
-  app.use(
-    '/v1/payment-reliability',
-    paidRoute(
-      'POST',
-      '/v1/payment-reliability',
-      PRICE_PAYMENT_RELIABILITY,
-      'MoneyHunter payment reliability check'
-    )
-  );
+  app.get('/', (_req, res) => res.json({
+    name: 'MoneyHunter x402 Gateway',
+    version: '0.3.0',
+    network: NETWORK,
+    origin: ORIGIN_URL,
+    prices: {
+      preflight: PRICE_PREFLIGHT,
+      radar: PRICE_RADAR,
+      payment_reliability: PRICE_PAYMENT_RELIABILITY
+    }
+  }));
 
-  app.all('/v1/*', async (c) => {
-    const url = new URL(c.req.url);
-    const upstream = `${ORIGIN_URL}${url.pathname}${url.search}`;
-    const headers = new Headers(c.req.raw.headers);
+  app.get('/health', (_req, res) => res.json({
+    ok: true,
+    service: 'moneyhunter-x402-gateway',
+    adapter: 'express',
+    network: NETWORK,
+    origin: ORIGIN_URL,
+    pay_to_configured: isEvmAddress(PAY_TO)
+  }));
 
-    headers.delete('host');
-    headers.delete('payment-signature');
-    headers.delete('payment-required');
-    headers.delete('payment-response');
+  if (isEvmAddress(PAY_TO)) {
+    const facilitator = new HTTPFacilitatorClient({ url: 'https://x402.org/facilitator' });
+    const resourceServer = new x402ResourceServer(facilitator)
+      .register('eip155:84532', new ExactEvmScheme())
+      .register('eip155:8453', new ExactEvmScheme());
 
-    const response = await fetch(upstream, {
-      method: c.req.method,
-      headers,
-      body: ['GET', 'HEAD'].includes(c.req.method)
-        ? undefined
-        : c.req.raw.body,
-      redirect: 'follow'
-    });
+    app.use(paymentMiddleware(
+      paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PAYMENT_RELIABILITY }),
+      resourceServer
+    ));
+  } else {
+    app.use('/v1', (_req, res) => res.status(503).json({
+      error: 'x402_not_configured',
+      detail: 'PAY_TO must be a valid public EVM address.'
+    }));
+  }
 
-    return new Response(response.body, {
-      status: response.status,
-      headers: response.headers
+  app.get('/v1/radar', async (req, res, next) => {
+    try {
+      const query = new URLSearchParams(req.query).toString();
+      const upstream = await fetch(`${ORIGIN_URL}/v1/radar${query ? `?${query}` : ''}`);
+      await relay(upstream, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/v1/preflight', async (req, res, next) => {
+    try {
+      const upstream = await fetch(`${ORIGIN_URL}/v1/preflight`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+      });
+      await relay(upstream, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/v1/payment-reliability', async (req, res, next) => {
+    try {
+      const upstream = await fetch(`${ORIGIN_URL}/v1/payment-reliability`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+      });
+      await relay(upstream, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.use((error, _req, res, _next) => {
+    console.error('gateway_error', error);
+    res.status(500).json({
+      error: 'gateway_internal_error',
+      detail: error instanceof Error ? error.message : String(error)
     });
   });
 
