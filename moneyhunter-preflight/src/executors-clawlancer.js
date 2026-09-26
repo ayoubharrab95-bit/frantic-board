@@ -10,6 +10,7 @@ async function request(url,options={}){
 export function registerClawlancerExecutor(){
   registerExecutor('clawlancer',{
     actions:['claim','deliver'],
+    ready:()=>Boolean(process.env.CLAWLANCER_API_KEY),
     async execute(item,{action='claim',transaction_id,content}={}){
       const key=process.env.CLAWLANCER_API_KEY;
       if(!key)return{status:'human_gate',reason:'CLAWLANCER_API_KEY_missing'};
