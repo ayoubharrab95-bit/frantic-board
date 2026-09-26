@@ -66,6 +66,22 @@ test('Base mainnet radar advertises real USDC price and recipient', async () => 
     assert.equal(decoded.accepts?.[0]?.network, 'eip155:8453');
     assert.equal(decoded.accepts?.[0]?.payTo?.toLowerCase(), PAY_TO.toLowerCase());
     assert.equal(Number(decoded.accepts?.[0]?.amount), 100000);
+    assert.ok(decoded.extensions?.bazaar, 'Bazaar discovery extension must be present');
+  });
+});
+
+test('production gateway exposes machine-readable discovery surfaces', async () => {
+  await withServer({ NETWORK: 'eip155:8453' }, async (base) => {
+    const manifestRes = await fetch(`${base}/.well-known/x402`);
+    assert.equal(manifestRes.status, 200);
+    const manifest = await manifestRes.json();
+    assert.ok(manifest.resources.some((url) => url.endsWith('/v1/radar')));
+
+    const openapiRes = await fetch(`${base}/openapi.json`);
+    assert.equal(openapiRes.status, 200);
+    const openapi = await openapiRes.json();
+    assert.equal(openapi.openapi, '3.1.0');
+    assert.equal(openapi.paths['/v1/radar'].get['x-payment-info'].protocols[0], 'x402');
   });
 });
 

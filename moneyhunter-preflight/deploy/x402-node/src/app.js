@@ -2,6 +2,7 @@ import express from 'express';
 import { paymentMiddleware } from '@x402/express';
 import { x402ResourceServer, HTTPFacilitatorClient } from '@x402/core/server';
 import { ExactEvmScheme } from '@x402/evm/exact/server';
+import { declareDiscoveryExtension, bazaarResourceServerExtension } from '@x402/extensions/bazaar';
 
 const isEvmAddress = (value) => /^0x[a-fA-F0-9]{40}$/.test(value || '');
 
@@ -15,7 +16,26 @@ function paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PA
         payTo: PAY_TO,
         maxTimeoutSeconds: 120
       },
-      description: 'MoneyHunter bounty preflight'
+      description: 'Preflight a public GitHub bounty before an AI agent spends compute.',
+      extensions: {
+        ...declareDiscoveryExtension({
+          input: { issue_url: 'https://github.com/owner/repo/issues/123' },
+          inputSchema: {
+            properties: {
+              issue_url: { type: 'string', format: 'uri', description: 'Public GitHub issue URL' }
+            },
+            required: ['issue_url']
+          },
+          bodyType: 'json',
+          output: {
+            example: {
+              recommendation: 'GO',
+              scores: { payment: 90, competition: 85, clarity: 90, ai_fit: 100, freshness: 100, priority: 92 },
+              red_flags: []
+            }
+          }
+        })
+      }
     },
     'GET /v1/radar': {
       accepts: {
@@ -25,7 +45,37 @@ function paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PA
         payTo: PAY_TO,
         maxTimeoutSeconds: 120
       },
-      description: 'MoneyHunter paid opportunity radar'
+      description: 'Find and rank live AI-friendly paid software opportunities.',
+      extensions: {
+        ...declareDiscoveryExtension({
+          input: {
+            min_reward: 5,
+            limit: 25,
+            sources: 'frantic,github,algora,opire'
+          },
+          inputSchema: {
+            properties: {
+              min_reward: { type: 'number', minimum: 0 },
+              limit: { type: 'integer', minimum: 1, maximum: 100 },
+              sources: { type: 'string', description: 'Comma-separated source names' }
+            }
+          },
+          output: {
+            example: {
+              count: 1,
+              opportunities: [
+                {
+                  source: 'frantic',
+                  reward: 10,
+                  currency: 'USD',
+                  status: 'open',
+                  expected_value_usd: 7.5
+                }
+              ]
+            }
+          }
+        })
+      }
     },
     'POST /v1/payment-reliability': {
       accepts: {
@@ -35,7 +85,25 @@ function paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PA
         payTo: PAY_TO,
         maxTimeoutSeconds: 120
       },
-      description: 'MoneyHunter payment reliability check'
+      description: 'Check funding and payment credibility signals for a GitHub bounty.',
+      extensions: {
+        ...declareDiscoveryExtension({
+          input: { issue_url: 'https://github.com/owner/repo/issues/123' },
+          inputSchema: {
+            properties: {
+              issue_url: { type: 'string', format: 'uri' }
+            },
+            required: ['issue_url']
+          },
+          bodyType: 'json',
+          output: {
+            example: {
+              payment: { score: 85, positive_signals: ['USDC payout'], warnings: [] },
+              recommendation: 'GO'
+            }
+          }
+        })
+      }
     }
   };
 }
@@ -99,6 +167,172 @@ export function createApp(config = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '64kb' }));
+
+  const publicBase = 'https://moneyhunter-x402-gateway.onrender.com';
+  const paidResources = [
+    { method: 'POST', path: '/v1/preflight', price: PRICE_PREFLIGHT, description: 'Preflight a public GitHub bounty before agent compute.' },
+    { method: 'GET', path: '/v1/radar', price: PRICE_RADAR, description: 'Rank live AI-friendly paid opportunities.' },
+    { method: 'POST', path: '/v1/payment-reliability', price: PRICE_PAYMENT_RELIABILITY, description: 'Check bounty payment and funding credibility.' }
+  ];
+
+  app.get('/.well-known/x402', (_req, res) => res.json({
+    version: 1,
+    provider: 'MoneyHunter',
+    network: NETWORK,
+    currency: 'USDC',
+    resources: paidResources.map((r) => `${publicBase}${r.path}`)
+  }));
+
+  app.get('/openapi.json', (_req, res) => {
+    const paths = {};
+    for (const resource of paidResources) {
+      paths[resource.path] ||= {};
+      paths[resource.path][resource.method.toLowerCase()] = {
+        summary: resource.description,
+        'x-payment-info': {
+          protocols: ['x402'],
+          network: NETWORK,
+          price: { mode: 'fixed', currency: 'USD', amount: resource.price.replace('
+
+  app.get('/test-payment', (_req, res) => {
+    if (NETWORK !== 'eip155:84532') {
+      return res.status(404).json({
+        error: 'test_payment_disabled',
+        detail: 'The browser test page is available only on Base Sepolia.'
+      });
+    }
+    return res.type('html').send(testPage());
+  });
+
+  app.get('/', (_req, res) => res.json({
+    name: 'MoneyHunter x402 Gateway',
+    version: '0.3.0',
+    network: NETWORK,
+    origin: ORIGIN_URL,
+    prices: {
+      preflight: PRICE_PREFLIGHT,
+      radar: PRICE_RADAR,
+      payment_reliability: PRICE_PAYMENT_RELIABILITY
+    }
+  }));
+
+  app.get('/health', (_req, res) => res.json({
+    ok: true,
+    service: 'moneyhunter-x402-gateway',
+    adapter: 'express',
+    network: NETWORK,
+    origin: ORIGIN_URL,
+    pay_to_configured: isEvmAddress(PAY_TO),
+    facilitator: FACILITATOR_URL,
+    production: NETWORK === 'eip155:8453'
+  }));
+
+  if (isEvmAddress(PAY_TO)) {
+    const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
+    const resourceServer = new x402ResourceServer(facilitator)
+      .register('eip155:84532', new ExactEvmScheme())
+      .register('eip155:8453', new ExactEvmScheme())
+      .registerExtension(bazaarResourceServerExtension);
+
+    app.use(paymentMiddleware(
+      paymentRoutes({ NETWORK, PAY_TO, PRICE_PREFLIGHT, PRICE_RADAR, PRICE_PAYMENT_RELIABILITY }),
+      resourceServer
+    ));
+  } else {
+    app.use('/v1', (_req, res) => res.status(503).json({
+      error: 'x402_not_configured',
+      detail: 'PAY_TO must be a valid public EVM address.'
+    }));
+  }
+
+  app.get('/v1/radar', async (req, res, next) => {
+    try {
+      const query = new URLSearchParams(req.query).toString();
+      const upstream = await fetch(`${ORIGIN_URL}/v1/radar${query ? `?${query}` : ''}`);
+      await relay(upstream, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/v1/preflight', async (req, res, next) => {
+    try {
+      const upstream = await fetch(`${ORIGIN_URL}/v1/preflight`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+      });
+      await relay(upstream, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/v1/payment-reliability', async (req, res, next) => {
+    try {
+      const upstream = await fetch(`${ORIGIN_URL}/v1/payment-reliability`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(req.body || {})
+      });
+      await relay(upstream, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.use((error, _req, res, _next) => {
+    console.error('gateway_error', error);
+    res.status(500).json({
+      error: 'gateway_internal_error',
+      detail: error instanceof Error ? error.message : String(error)
+    });
+  });
+
+  return app;
+}
+
+export { isEvmAddress };
+, '') }
+        },
+        responses: {
+          '200': { description: 'Paid response' },
+          '402': { description: 'x402 payment required' }
+        }
+      };
+    }
+    res.json({
+      openapi: '3.1.0',
+      info: {
+        title: 'MoneyHunter x402 API',
+        version: '0.4.0',
+        description: 'Paid-opportunity discovery and bounty preflight for AI agents.'
+      },
+      servers: [{ url: publicBase }],
+      'x-discovery': { ownershipProofs: [PAY_TO] },
+      paths
+    });
+  });
+
+  app.get('/llms.txt', (_req, res) => {
+    res.type('text/plain').send(
+      [
+        '# MoneyHunter x402 API',
+        '',
+        'Paid gateway: ' + publicBase,
+        'Protocol: x402 v2',
+        'Network: ' + NETWORK,
+        'Currency: USDC',
+        '',
+        'POST /v1/preflight — ' + PRICE_PREFLIGHT,
+        'GET /v1/radar — ' + PRICE_RADAR,
+        'POST /v1/payment-reliability — ' + PRICE_PAYMENT_RELIABILITY,
+        '',
+        'Unpaid calls return HTTP 402 with PAYMENT-REQUIRED.'
+      ].join('\\n')
+    );
+  });
+
 
   app.get('/test-payment', (_req, res) => {
     if (NETWORK !== 'eip155:84532') {
