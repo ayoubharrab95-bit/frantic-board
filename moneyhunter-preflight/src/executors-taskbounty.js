@@ -12,6 +12,7 @@ function auth(name){return process.env[name]||null;}
 export function registerTaskBountyExecutor(){
   registerExecutor('taskbounty',{
     actions:['claim_access','submit_pr'],
+    ready:()=>Boolean(process.env.TASKBOUNTY_API_KEY),
     async execute(item,{action='claim_access',external_link,result_text}={}){
       const key=auth('TASKBOUNTY_API_KEY');
       if(!key)return{status:'human_gate',reason:'TASKBOUNTY_API_KEY_missing'};
