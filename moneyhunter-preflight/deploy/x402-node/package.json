@@ -1,10 +1,13 @@
 {
   "name": "moneyhunter-x402-node-gateway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test",
+    "verify": "npm test",
+    "postinstall": "npm run verify"
   },
   "engines": {
     "node": ">=20"
