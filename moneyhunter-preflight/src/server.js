@@ -29,7 +29,7 @@ function parseRadarQuery(urlString = '/') {
   const url = new URL(urlString, 'http://localhost');
   const minReward = Number(url.searchParams.get('min_reward') || 5);
   const limit = Number(url.searchParams.get('limit') || 25);
-  const sources = (url.searchParams.get('sources') || 'frantic')
+  const sources = (url.searchParams.get('sources') || 'frantic,github,algora,opire')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
@@ -48,8 +48,17 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, {
       ok: true,
       service: 'moneyhunter-preflight',
-      version: '0.2.0',
-      features: ['github_preflight', 'opportunity_radar', 'mcp', 'x402_ready']
+      version: '0.3.0',
+      features: [
+        'github_preflight',
+        'multi_source_opportunity_radar',
+        'frantic_adapter',
+        'github_paid_issue_adapter',
+        'algora_adapter',
+        'opire_adapter',
+        'mcp',
+        'x402_ready'
+      ]
     });
   }
 
@@ -70,13 +79,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url?.startsWith('/v1/radar')) {
     try {
       const params = parseRadarQuery(req.url);
-      const opportunities = await runRadar(params);
-      return json(res, 200, {
-        generated_at: new Date().toISOString(),
-        filters: params,
-        count: opportunities.length,
-        opportunities
-      });
+      const result = await runRadar(params);
+      return json(res, 200, { filters: params, ...result });
     } catch (error) {
       return json(res, 502, {
         error: error instanceof Error ? error.message : String(error)
