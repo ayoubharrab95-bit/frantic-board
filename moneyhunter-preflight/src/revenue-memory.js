@@ -63,7 +63,8 @@ export function summarizeLedger(ledger=[]){
   return Object.values(bySource);
 }
 
-export async function rebuildSourcePriors(ledger=await readLedger()){
+export async function rebuildSourcePriors(ledger){
+  if(!ledger) ledger=await readLedger();
   const summaries=summarizeLedger(ledger), priors={...DEFAULT_PRIORS};
   for(const x of summaries){
     if(x.attempts<3) continue;
