@@ -2,11 +2,12 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
 import { analyzeIssueUrl } from './analyze.js';
+import { runRadar } from './radar.js';
 
 serveStdio(() => {
   const server = new McpServer({
-    name: 'bounty-preflight',
-    version: '0.1.0'
+    name: 'moneyhunter-preflight',
+    version: '0.2.0'
   });
 
   server.registerTool(
@@ -19,19 +20,41 @@ serveStdio(() => {
         issue_url: z.string().url().describe('Public GitHub issue URL')
       })
     },
-    async ({ issue_url }) => {
-      const result = await analyzeIssueUrl(issue_url);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(result, null, 2)
-          }
-        ]
-      };
-    }
+    async ({ issue_url }) => ({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(await analyzeIssueUrl(issue_url), null, 2)
+        }
+      ]
+    })
   );
 
-  console.error('bounty-preflight MCP server running on stdio');
+  server.registerTool(
+    'find_paid_opportunities',
+    {
+      title: 'Find paid AI-friendly opportunities',
+      description:
+        'Run the zero-LLM opportunity radar and return ranked live opportunities from supported public sources.',
+      inputSchema: z.object({
+        min_reward: z.number().min(0).default(5),
+        limit: z.number().int().min(1).max(100).default(25)
+      })
+    },
+    async ({ min_reward, limit }) => ({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            await runRadar({ minReward: min_reward, limit }),
+            null,
+            2
+          )
+        }
+      ]
+    })
+  );
+
+  console.error('moneyhunter-preflight MCP server running on stdio');
   return server;
 });
