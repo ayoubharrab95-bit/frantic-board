@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { analyzeIssueUrl } from './analyze.js';
+import { runRadar } from './radar.js';
 
 const port = Number(process.env.PORT || 8787);
 
@@ -24,14 +25,31 @@ async function readJson(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function parseRadarQuery(urlString = '/') {
+  const url = new URL(urlString, 'http://localhost');
+  const minReward = Number(url.searchParams.get('min_reward') || 5);
+  const limit = Number(url.searchParams.get('limit') || 25);
+  const sources = (url.searchParams.get('sources') || 'frantic')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return {
+    minReward: Number.isFinite(minReward) ? Math.max(0, minReward) : 5,
+    limit: Number.isFinite(limit) ? Math.min(100, Math.max(1, limit)) : 25,
+    sources
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, {});
 
   if (req.method === 'GET' && req.url === '/health') {
     return json(res, 200, {
       ok: true,
-      service: 'bounty-preflight',
-      version: '0.1.0'
+      service: 'moneyhunter-preflight',
+      version: '0.2.0',
+      features: ['github_preflight', 'opportunity_radar', 'mcp', 'x402_ready']
     });
   }
 
@@ -41,10 +59,26 @@ const server = http.createServer(async (req, res) => {
       if (!payload.issue_url) {
         return json(res, 400, { error: 'issue_url is required' });
       }
-      const result = await analyzeIssueUrl(payload.issue_url);
-      return json(res, 200, result);
+      return json(res, 200, await analyzeIssueUrl(payload.issue_url));
     } catch (error) {
       return json(res, 422, {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  if (req.method === 'GET' && req.url?.startsWith('/v1/radar')) {
+    try {
+      const params = parseRadarQuery(req.url);
+      const opportunities = await runRadar(params);
+      return json(res, 200, {
+        generated_at: new Date().toISOString(),
+        filters: params,
+        count: opportunities.length,
+        opportunities
+      });
+    } catch (error) {
+      return json(res, 502, {
         error: error instanceof Error ? error.message : String(error)
       });
     }
@@ -54,5 +88,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.error(`bounty-preflight listening on http://localhost:${port}`);
+  console.error(`moneyhunter-preflight listening on http://localhost:${port}`);
 });
