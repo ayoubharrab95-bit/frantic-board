@@ -1,13 +1,7 @@
 name: MoneyHunter Preflight CI
 
 on:
-  push:
-    branches:
-      - moneyhunter/bounty-preflight-v0
-  pull_request:
-    paths:
-      - "moneyhunter-preflight/**"
-      - ".github/workflows/moneyhunter-preflight-ci.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
