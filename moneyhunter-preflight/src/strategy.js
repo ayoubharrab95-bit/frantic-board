@@ -1,4 +1,3 @@
-import { getSourcePriors } from './revenue-memory.js';
 const DEFAULT_SOURCE_PRIOR = {
   frantic: 1.00,
   github: 0.82,
@@ -6,7 +5,10 @@ const DEFAULT_SOURCE_PRIOR = {
   opire: 0.55
 };
 
-let SOURCE_PRIOR = { ...DEFAULT_SOURCE_PRIOR };\nexport function setSourcePriors(priors={}) { SOURCE_PRIOR = { ...DEFAULT_SOURCE_PRIOR, ...priors }; return SOURCE_PRIOR; }\n\nfunction clamp(value, min=0, max=1) {
+let SOURCE_PRIOR = { ...DEFAULT_SOURCE_PRIOR };
+export function setSourcePriors(priors={}) { SOURCE_PRIOR = { ...DEFAULT_SOURCE_PRIOR, ...priors }; return SOURCE_PRIOR; }
+
+function clamp(value, min=0, max=1) {
   return Math.max(min, Math.min(max, Number(value) || 0));
 }
 
