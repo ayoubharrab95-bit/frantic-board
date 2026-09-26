@@ -4,6 +4,9 @@ import { discoverAlgora } from './sources/algora.js';
 import { discoverOpire } from './sources/opire.js';
 import { opportunityKey } from './opportunity.js';
 
+const CACHE_TTL_MS = Number(process.env.RADAR_CACHE_TTL_MS || 60_000);
+const cache = new Map();
+
 function normalizedCompetition(item) {
   if (item.competition_score != null) return Math.max(0, Math.min(1, item.competition_score));
   const claims = item.active_claims ?? 0;
@@ -22,15 +25,14 @@ function aiMultiplier(item) {
   return 0.72;
 }
 
-function valueScore(item) {
-  const reward = item.reward ?? 0;
-  const availability = item.available_slots == null ? 1 : Math.max(0, item.available_slots);
-  const availabilityBoost = Math.min(2, Math.max(1, availability));
+function expectedValue(item) {
+  const reward = Math.max(0, Number(item.reward) || 0);
   const payment = normalizedPayment(item);
   const competition = normalizedCompetition(item);
+  const ai = aiMultiplier(item);
   const manualPaymentPenalty = item.requires_manual_payment ? 0.7 : 1;
   const openMultiplier = item.status === 'open' ? 1 : 0;
-  return reward * payment * competition * aiMultiplier(item) * manualPaymentPenalty * availabilityBoost * openMultiplier;
+  return reward * payment * competition * ai * manualPaymentPenalty * openMultiplier;
 }
 
 async function safe(label, fn) {
@@ -41,17 +43,41 @@ async function safe(label, fn) {
   }
 }
 
+function cacheKey({ sources, minReward, limit }) {
+  return JSON.stringify({
+    sources: [...sources].sort(),
+    minReward,
+    limit
+  });
+}
+
+export function clearRadarCache() {
+  cache.clear();
+}
+
 export async function runRadar({
   sources = ['frantic', 'github', 'algora', 'opire'],
   minReward = 5,
-  limit = 25
+  limit = 25,
+  useCache = true
 } = {}) {
-  const jobs = [];
+  const params = {
+    sources: [...new Set(sources)].filter((s) => ['frantic', 'github', 'algora', 'opire'].includes(s)),
+    minReward: Math.max(0, Number(minReward) || 0),
+    limit: Math.min(100, Math.max(1, Number(limit) || 25))
+  };
 
-  if (sources.includes('frantic')) jobs.push(safe('frantic', () => discoverFrantic({ limit })));
-  if (sources.includes('github')) jobs.push(safe('github', () => discoverGitHubPaid({ limit })));
-  if (sources.includes('algora')) jobs.push(safe('algora', () => discoverAlgora({ limit })));
-  if (sources.includes('opire')) jobs.push(safe('opire', () => discoverOpire({ limit })));
+  const key = cacheKey(params);
+  const cached = cache.get(key);
+  if (useCache && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return { ...cached.value, cached: true };
+  }
+
+  const jobs = [];
+  if (params.sources.includes('frantic')) jobs.push(safe('frantic', () => discoverFrantic({ limit: params.limit })));
+  if (params.sources.includes('github')) jobs.push(safe('github', () => discoverGitHubPaid({ limit: params.limit })));
+  if (params.sources.includes('algora')) jobs.push(safe('algora', () => discoverAlgora({ limit: params.limit })));
+  if (params.sources.includes('opire')) jobs.push(safe('opire', () => discoverOpire({ limit: params.limit })));
 
   const batches = await Promise.all(jobs);
   const found = batches.flatMap((b) => b.items);
@@ -68,22 +94,37 @@ export async function runRadar({
   const opportunities = deduped
     .filter((item) => item.status === 'open')
     .filter((item) => item.ai_policy !== 'prohibited')
-    .filter((item) => (item.reward ?? 0) >= minReward)
-    .map((item) => ({
-      ...item,
-      radar_score: Number(valueScore(item).toFixed(2)),
-      payment_confidence: Number(normalizedPayment(item).toFixed(2)),
-      competition_score: Number(normalizedCompetition(item).toFixed(2))
-    }))
-    .filter((item) => item.radar_score > 0)
-    .sort((a, b) => b.radar_score - a.radar_score)
-    .slice(0, limit);
+    .filter((item) => (item.reward ?? 0) >= params.minReward)
+    .map((item) => {
+      const payment = normalizedPayment(item);
+      const competition = normalizedCompetition(item);
+      const ev = expectedValue(item);
+      return {
+        ...item,
+        expected_value_usd: Number(ev.toFixed(2)),
+        radar_score: Number((ev * Math.max(0.25, payment) * Math.max(0.25, competition)).toFixed(2)),
+        payment_confidence: Number(payment.toFixed(2)),
+        competition_score: Number(competition.toFixed(2))
+      };
+    })
+    .filter((item) => item.expected_value_usd > 0)
+    .sort((a, b) => b.radar_score - a.radar_score || b.expected_value_usd - a.expected_value_usd)
+    .slice(0, params.limit);
 
-  return {
+  const value = {
     generated_at: new Date().toISOString(),
-    requested_sources: sources,
-    source_status: Object.fromEntries(batches.map((b) => [b.label, b.error ? { ok: false, error: b.error } : { ok: true, found: b.items.length }])),
+    requested_sources: params.sources,
+    source_status: Object.fromEntries(
+      batches.map((b) => [
+        b.label,
+        b.error ? { ok: false, error: b.error } : { ok: true, found: b.items.length }
+      ])
+    ),
     count: opportunities.length,
-    opportunities
+    opportunities,
+    cached: false
   };
+
+  cache.set(key, { at: Date.now(), value });
+  return value;
 }
