@@ -7,6 +7,7 @@ import { PRICING, PUBLIC_MANIFEST, LLMS_TEXT, OPENAPI } from './product.js';
 import { revenueOffers } from './offers.js';
 import { revenueMemorySummary, recordOutcome, enqueueOpportunity, updateExecution, executionQueue, readLedger } from './revenue-memory.js';
 import { buildExecutionPlan } from './execution-policy.js';
+import { listExecutors, executorStatus, executeOpportunity } from './executor.js';
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
 const port=Number(process.env.PORT||8787);
 const headers=t=>({'content-type':t,'access-control-allow-origin':'*','access-control-allow-headers':'content-type, authorization, payment-signature','access-control-allow-methods':'GET,POST,OPTIONS'});
@@ -24,6 +25,8 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
  if(req.method==='GET'&&req.url==='/v1/revenue-plan')return json(res,200,{generated_at:new Date().toISOString(),lanes:revenueLanes(),plan:buildRevenuePlan()},{'cache-control':'public, max-age=120'});
+ if(req.method==='GET'&&req.url==='/v1/executors')return json(res,200,{executors:listExecutors()},{'cache-control':'no-store'});
+ if(req.method==='POST'&&req.url==='/v1/execution/preview'){try{const p=await readJson(req);return json(res,200,await executeOpportunity({...p,policy:buildExecutionPlan([p])[0]?.policy},{dryRun:true}))}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/execution-queue')return json(res,200,{queue:buildExecutionPlan(executionQueue(await readLedger()))},{'cache-control':'no-store'});
  if(req.method==='POST'&&req.url==='/v1/execution-queue'){const token=process.env.MEMORY_WRITE_TOKEN;if(!token||req.headers.authorization!==`Bearer ${token}`)return json(res,403,{error:'queue_write_disabled_or_unauthorized'});try{const p=await readJson(req);return json(res,201,{execution:await enqueueOpportunity(p)})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='PATCH'&&req.url?.startsWith('/v1/execution-queue/')){const token=process.env.MEMORY_WRITE_TOKEN;if(!token||req.headers.authorization!==`Bearer ${token}`)return json(res,403,{error:'queue_write_disabled_or_unauthorized'});try{const id=decodeURIComponent(req.url.split('/').pop());const p=await readJson(req);return json(res,200,{execution:await updateExecution(id,p)})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
