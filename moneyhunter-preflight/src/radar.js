@@ -5,9 +5,11 @@ import { discoverOpire } from './sources/opire.js';
 import { discoverClawlancer } from './sources/clawlancer.js';
 import { discoverMya } from './sources/mya.js';
 import { discoverBasedAgents } from './sources/basedagents.js';
+import { discoverTaskBounty } from './sources/taskbounty.js';
 import { opportunityKey } from './opportunity.js';
 import { buildStrategyPlan, improvementProposals, enrichEconomics } from './strategy.js';
 
+const SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty'];
 const CACHE_TTL_MS=Number(process.env.RADAR_CACHE_TTL_MS||60000),cache=new Map();
 const clamp=(x)=>Math.max(0,Math.min(1,Number(x)||0));
 function normalizedCompetition(i){if(i.competition_score!=null)return clamp(i.competition_score);return 1/(1+(i.active_claims??0));}
@@ -17,8 +19,8 @@ function expectedValue(i){const reward=Math.max(0,Number(i.reward)||0),payment=n
 async function safe(label,fn){try{return{label,items:await fn(),error:null}}catch(error){return{label,items:[],error:error instanceof Error?error.message:String(error)}}}
 function cacheKey({sources,minReward,limit}){return JSON.stringify({sources:[...sources].sort(),minReward,limit});}
 export function clearRadarCache(){cache.clear();}
-export async function runRadar({sources=['frantic','github','algora','opire','clawlancer','mya','basedagents'],minReward=5,limit=25,useCache=true}={}){
- const params={sources:[...new Set(sources)].filter(s=>['frantic','github','algora','opire','clawlancer','mya','basedagents'].includes(s)),minReward:Math.max(0,Number(minReward)||0),limit:Math.min(100,Math.max(1,Number(limit)||25))};
+export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=true}={}){
+ const params={sources:[...new Set(sources)].filter(s=>SOURCES.includes(s)),minReward:Math.max(0,Number(minReward)||0),limit:Math.min(100,Math.max(1,Number(limit)||25))};
  const key=cacheKey(params),cached=cache.get(key);if(useCache&&cached&&Date.now()-cached.at<CACHE_TTL_MS)return{...cached.value,cached:true};
  const jobs=[];
  if(params.sources.includes('frantic'))jobs.push(safe('frantic',()=>discoverFrantic({limit:params.limit})));
@@ -28,6 +30,7 @@ export async function runRadar({sources=['frantic','github','algora','opire','cl
  if(params.sources.includes('clawlancer'))jobs.push(safe('clawlancer',()=>discoverClawlancer({limit:params.limit})));
  if(params.sources.includes('mya'))jobs.push(safe('mya',()=>discoverMya({limit:params.limit})));
  if(params.sources.includes('basedagents'))jobs.push(safe('basedagents',()=>discoverBasedAgents({limit:params.limit})));
+ if(params.sources.includes('taskbounty'))jobs.push(safe('taskbounty',()=>discoverTaskBounty({limit:params.limit})));
  const batches=await Promise.all(jobs),found=batches.flatMap(b=>b.items),seen=new Set(),deduped=[];
  for(const item of found){const k=opportunityKey(item);if(seen.has(k))continue;seen.add(k);deduped.push(item);}
  const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward).map(i=>{
