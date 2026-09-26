@@ -18,7 +18,7 @@ async function safe(label,fn){try{return{label,items:await fn(),error:null}}catc
 function cacheKey({sources,minReward,limit}){return JSON.stringify({sources:[...sources].sort(),minReward,limit});}
 export function clearRadarCache(){cache.clear();}
 export async function runRadar({sources=['frantic','github','algora','opire','clawlancer','mya','basedagents'],minReward=5,limit=25,useCache=true}={}){
- const params={sources:[...new Set(sources)].filter(s=>['frantic','github','algora','opire'].includes(s)),minReward:Math.max(0,Number(minReward)||0),limit:Math.min(100,Math.max(1,Number(limit)||25))};
+ const params={sources:[...new Set(sources)].filter(s=>['frantic','github','algora','opire','clawlancer','mya','basedagents'].includes(s)),minReward:Math.max(0,Number(minReward)||0),limit:Math.min(100,Math.max(1,Number(limit)||25))};
  const key=cacheKey(params),cached=cache.get(key);if(useCache&&cached&&Date.now()-cached.at<CACHE_TTL_MS)return{...cached.value,cached:true};
  const jobs=[];
  if(params.sources.includes('frantic'))jobs.push(safe('frantic',()=>discoverFrantic({limit:params.limit})));
