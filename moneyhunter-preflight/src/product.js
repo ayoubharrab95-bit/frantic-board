@@ -1,7 +1,9 @@
 export const PRICING = {
-  currency: 'USD',
+  currency: 'USDC',
   settlement_target: 'x402',
-  network: 'Base',
+  network: 'Base mainnet',
+  network_id: 'eip155:8453',
+  paid_gateway: 'https://moneyhunter-x402-gateway.onrender.com',
   tools: {
     bounty_preflight: {
       price_usd: 0.05,
@@ -23,9 +25,17 @@ export const PRICING = {
 
 export const PUBLIC_MANIFEST = {
   name: 'MoneyHunter',
-  version: '0.3.0',
+  version: '0.4.0',
   description: 'Zero-LLM-first paid-opportunity radar and bounty preflight for AI agents.',
-  origin: 'https://moneyhunter-preflight.onrender.com',
+  free_origin: 'https://moneyhunter-preflight.onrender.com',
+  paid_gateway: PRICING.paid_gateway,
+  payments: {
+    protocol: 'x402 v2',
+    network: PRICING.network,
+    network_id: PRICING.network_id,
+    currency: 'USDC',
+    status: 'live'
+  },
   features: [
     'github_preflight',
     'payment_reliability',
@@ -35,17 +45,18 @@ export const PUBLIC_MANIFEST = {
     'algora_adapter',
     'opire_adapter',
     'mcp_stdio',
-    'x402_ready',
+    'x402_mainnet',
     'agent_discovery'
   ],
   endpoints: {
-    health: '/health',
-    pricing: '/v1/pricing',
-    preflight: '/v1/preflight',
-    payment_reliability: '/v1/payment-reliability',
-    radar: '/v1/radar',
-    openapi: '/openapi.json',
-    llms: '/llms.txt'
+    free_health: 'https://moneyhunter-preflight.onrender.com/health',
+    paid_health: 'https://moneyhunter-x402-gateway.onrender.com/health',
+    paid_preflight: 'https://moneyhunter-x402-gateway.onrender.com/v1/preflight',
+    paid_payment_reliability: 'https://moneyhunter-x402-gateway.onrender.com/v1/payment-reliability',
+    paid_radar: 'https://moneyhunter-x402-gateway.onrender.com/v1/radar',
+    pricing: 'https://moneyhunter-preflight.onrender.com/v1/pricing',
+    openapi: 'https://moneyhunter-preflight.onrender.com/openapi.json',
+    llms: 'https://moneyhunter-preflight.onrender.com/llms.txt'
   },
   pricing: PRICING,
   disclaimer:
@@ -54,24 +65,29 @@ export const PUBLIC_MANIFEST = {
 
 export const LLMS_TEXT = `# MoneyHunter
 
-MoneyHunter helps AI agents decide which paid software opportunities are worth attempting before they spend compute.
+MoneyHunter helps AI agents find and preflight paid software opportunities before spending compute.
 
-Origin: https://moneyhunter-preflight.onrender.com
+Free discovery origin: https://moneyhunter-preflight.onrender.com
+Paid x402 gateway: https://moneyhunter-x402-gateway.onrender.com
+Payment network: Base mainnet (eip155:8453)
+Payment currency: USDC
 
-## Free discovery
-GET /
-GET /health
-GET /openapi.json
-GET /v1/pricing
+## Discovery
+GET https://moneyhunter-preflight.onrender.com/
+GET https://moneyhunter-preflight.onrender.com/health
+GET https://moneyhunter-preflight.onrender.com/openapi.json
+GET https://moneyhunter-preflight.onrender.com/v1/pricing
 
-## Tools
-POST /v1/preflight
+## Paid tools
+POST https://moneyhunter-x402-gateway.onrender.com/v1/preflight — $0.05 USDC
 Body: {"issue_url":"https://github.com/owner/repo/issues/123"}
 
-POST /v1/payment-reliability
+POST https://moneyhunter-x402-gateway.onrender.com/v1/payment-reliability — $0.03 USDC
 Body: {"issue_url":"https://github.com/owner/repo/issues/123"}
 
-GET /v1/radar?min_reward=5&limit=25&sources=frantic,github,algora,opire
+GET https://moneyhunter-x402-gateway.onrender.com/v1/radar?min_reward=5&limit=25&sources=frantic,github,algora,opire — $0.10 USDC
+
+Paid routes use x402 v2. An unpaid request receives HTTP 402 with PAYMENT-REQUIRED describing the Base mainnet USDC payment.
 
 ## Principles
 - verify source-of-truth state before compute
@@ -80,17 +96,26 @@ GET /v1/radar?min_reward=5&limit=25&sources=frantic,github,algora,opire
 - discount crowded work
 - prefer credible settlement and clear acceptance criteria
 
-Paid x402 routes are being prepared. Public scores are not guarantees.
+Scores are triage heuristics, not guarantees.
 `;
 
 export const OPENAPI = {
   openapi: '3.1.0',
   info: {
     title: 'MoneyHunter API',
-    version: '0.3.0',
-    description: 'Paid-opportunity discovery and preflight for AI agents.'
+    version: '0.4.0',
+    description: 'Paid-opportunity discovery and preflight for AI agents with x402 USDC payment on Base.'
   },
-  servers: [{ url: 'https://moneyhunter-preflight.onrender.com' }],
+  servers: [
+    {
+      url: 'https://moneyhunter-x402-gateway.onrender.com',
+      description: 'Production x402 gateway — Base mainnet USDC'
+    },
+    {
+      url: 'https://moneyhunter-preflight.onrender.com',
+      description: 'Free discovery/origin service'
+    }
+  ],
   paths: {
     '/health': {
       get: {
@@ -100,7 +125,7 @@ export const OPENAPI = {
     },
     '/v1/pricing': {
       get: {
-        summary: 'Current MoneyHunter launch pricing',
+        summary: 'Current MoneyHunter pricing',
         responses: { '200': { description: 'Pricing manifest' } }
       }
     },
@@ -112,7 +137,10 @@ export const OPENAPI = {
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 25, maximum: 100 } },
           { name: 'sources', in: 'query', schema: { type: 'string', default: 'frantic,github,algora,opire' } }
         ],
-        responses: { '200': { description: 'Ranked opportunities' } }
+        responses: {
+          '200': { description: 'Ranked opportunities after successful x402 payment on the paid gateway' },
+          '402': { description: 'Payment required; inspect PAYMENT-REQUIRED header for x402 v2 terms' }
+        }
       }
     },
     '/v1/preflight': {
@@ -133,7 +161,8 @@ export const OPENAPI = {
           }
         },
         responses: {
-          '200': { description: 'Preflight report' },
+          '200': { description: 'Preflight report after successful x402 payment on the paid gateway' },
+          '402': { description: 'Payment required' },
           '422': { description: 'Invalid or unsupported issue' }
         }
       }
@@ -155,7 +184,10 @@ export const OPENAPI = {
             }
           }
         },
-        responses: { '200': { description: 'Payment reliability report' } }
+        responses: {
+          '200': { description: 'Payment reliability report after successful x402 payment' },
+          '402': { description: 'Payment required' }
+        }
       }
     }
   }
