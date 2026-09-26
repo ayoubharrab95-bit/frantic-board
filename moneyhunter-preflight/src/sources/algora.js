@@ -1,4 +1,5 @@
 import { makeOpportunity } from '../opportunity.js';
+import { boundedFetch } from './network.js';
 
 const DEFAULT_ORGS = [
   'projectdiscovery',
@@ -73,22 +74,50 @@ export async function discoverAlgora({
   orgs = DEFAULT_ORGS,
   fetchImpl = fetch
 } = {}) {
-  const all = [];
-
-  for (const handle of orgs) {
-    if (all.length >= limit * 2) break;
-    try {
-      const res = await fetchImpl(`https://algora.io/${handle}/bounties`, {
-        headers: { 'user-agent': 'moneyhunter-preflight/0.3' }
-      });
-      if (!res.ok) continue;
-      all.push(...parseAlgoraOrg(handle, await res.text()));
-    } catch {
-      // One organization should never stop the entire radar.
+  // Bound concurrency and preserve organization order in the output. The old
+  // serial loop could take minutes when several organizations were slow.
+  const handles = orgs.slice(0, 40);
+  const rows = new Array(handles.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, handles.length) }, async () => {
+    while (next < handles.length) {
+      const index = next++;
+      const handle = handles[index];
+      try {
+        const res = await boundedFetch(fetchImpl, `https://algora.io/${handle}/bounties`, {
+          headers: { 'user-agent': 'moneyhunter-preflight/0.4' }
+        });
+        rows[index] = res.ok ? parseAlgoraOrg(handle, await res.text()) : [];
+      } catch {
+        rows[index] = [];
+      }
     }
-  }
-
-  return all.slice(0, limit);
+  }));
+  const candidates = rows.flat().slice(0, limit * 2);
+  const verified = new Array(candidates.length);
+  let nextIssue = 0;
+  await Promise.all(Array.from({ length: Math.min(4, candidates.length) }, async () => {
+    while (nextIssue < candidates.length) {
+      const index = nextIssue++;
+      const item = candidates[index];
+      const { org, repo, issue_number: number } = item.raw;
+      try {
+        const response = await boundedFetch(fetchImpl,
+          `https://api.github.com/repos/${encodeURIComponent(org)}/${encodeURIComponent(repo)}/issues/${number}`,
+          { headers: { accept: 'application/vnd.github+json',
+            ...(process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) } });
+        if (!response.ok) continue;
+        const issue = await response.json();
+        if (issue.state !== 'open' || issue.pull_request) continue;
+        item.raw.canonical_issue_url = issue.html_url;
+        item.raw.origin_verified = true;
+        verified[index] = item;
+      } catch {
+        // An inaccessible original is not evidence of an open, payable task.
+      }
+    }
+  }));
+  return verified.filter(Boolean).slice(0, limit);
 }
 
 export { DEFAULT_ORGS };

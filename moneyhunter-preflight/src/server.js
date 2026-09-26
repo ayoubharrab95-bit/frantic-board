@@ -77,7 +77,7 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, {
       ok: true,
       service: 'moneyhunter-preflight',
-      version: '0.3.0',
+      version: '0.4.1',
       features: PUBLIC_MANIFEST.features
     });
   }

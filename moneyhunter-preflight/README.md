@@ -39,6 +39,8 @@ Adapters currently present:
 
 The radar is zero-LLM-first, applies payment/competition/AI discounts, computes an expected-value estimate, deduplicates, and caches short-lived results to avoid wasting rate limits.
 
+Directory listings are leads, not payable work by themselves. Algora entries are included only when the original GitHub issue can be checked live and remains open. Opire home cards lack a reliable canonical issue URL, so they are marked `unverified` and excluded from the open radar until a detail-page verification is implemented. Upstream requests have deadlines and Algora organizations are checked with bounded concurrency; partial source failures are reported in `source_status`.
+
 ### 3. Payment reliability
 
 A focused endpoint returns:

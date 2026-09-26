@@ -1,4 +1,5 @@
 import { makeOpportunity } from '../opportunity.js';
+import { boundedFetch } from './network.js';
 
 const BASE = 'https://gofrantic.com';
 
@@ -28,9 +29,9 @@ export function parseFranticBountyPage(id, html = '') {
     .trim();
 
   const titleMatch = text.match(new RegExp(`#${id}\\s+(.+?)(?=\\s+(?:claim|claims|endpoint|requires|ledger|receipts|\\$\\d))`, 'i'));
-  const rewardMatch =
-    text.match(/(?:paid bounty is|reward|bounty)\s*\$\s*([0-9]+(?:\.[0-9]+)?)/i) ||
-    text.match(/\$\s*([0-9]+(?:\.[0-9]+)?)/);
+  // The page also says "this paid bounty is $10 or less". That number is an
+  // eligibility threshold, not the reward; require the funded price label.
+  const rewardMatch = text.match(/\$\s*([0-9]+(?:\.[0-9]+)?)\s+FUNDED\b/i);
 
   const available = numberAfter('available', html);
   const active = numberAfter('active', html);
@@ -55,7 +56,7 @@ export function parseFranticBountyPage(id, html = '') {
 }
 
 async function get(url, fetchImpl = fetch) {
-  const response = await fetchImpl(url, {
+  const response = await boundedFetch(fetchImpl, url, {
     headers: { 'user-agent': 'moneyhunter-preflight/0.2' }
   });
   if (!response.ok) throw new Error(`Frantic HTTP ${response.status} for ${url}`);

@@ -1,4 +1,5 @@
 import { makeOpportunity } from '../opportunity.js';
+import { boundedFetch } from './network.js';
 
 const HOME = 'https://app.opire.dev/home';
 
@@ -50,7 +51,9 @@ export function parseOpireHome(html = '') {
       title: `${owner}/${repo}: ${title}`,
       reward,
       currency: 'USD',
-      status: 'open',
+      // The home-page text does not carry a canonical issue link or live issue
+      // state. Directory entries routinely outlive closed GitHub issues.
+      status: 'unverified',
       active_claims: solvers,
       ai_policy: 'unknown',
       payment_confidence: 0.25 * suspiciousScale,
@@ -61,7 +64,7 @@ export function parseOpireHome(html = '') {
         repo,
         date,
         solvers,
-        warning: 'Opire claims do not create automatic payment; bounty creator arranges payment after review.'
+        warning: 'Original GitHub issue and reward must be checked on the detail page before this can be advertised as open.'
       }
     }));
   }
@@ -70,7 +73,7 @@ export function parseOpireHome(html = '') {
 }
 
 export async function discoverOpire({ limit = 25, fetchImpl = fetch } = {}) {
-  const res = await fetchImpl(HOME, {
+  const res = await boundedFetch(fetchImpl, HOME, {
     headers: { 'user-agent': 'moneyhunter-preflight/0.3' }
   });
   if (!res.ok) throw new Error(`Opire HTTP ${res.status}`);

@@ -1,5 +1,6 @@
 import { makeOpportunity } from '../opportunity.js';
 import { extractReward, detectAiPolicy, detectPaymentSignals } from '../signals.js';
+import { boundedFetch } from './network.js';
 
 const API = 'https://api.github.com';
 
@@ -14,7 +15,7 @@ function headers() {
 
 async function searchIssues(q, fetchImpl = fetch) {
   const url = `${API}/search/issues?q=${encodeURIComponent(q)}&sort=updated&order=desc&per_page=50`;
-  const res = await fetchImpl(url, { headers: headers() });
+  const res = await boundedFetch(fetchImpl, url, { headers: headers() });
   if (!res.ok) throw new Error(`GitHub search HTTP ${res.status}`);
   const json = await res.json();
   return json.items || [];
@@ -40,7 +41,7 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
 
   const merged = new Map();
 
-  for (const q of queries) {
+  await Promise.all(queries.map(async (q) => {
     try {
       for (const issue of await searchIssues(q, fetchImpl)) {
         if (!issue?.html_url || !isLikelyPaid(issue)) continue;
@@ -50,7 +51,7 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
     } catch {
       // A single query can rate-limit or fail without killing the whole radar.
     }
-  }
+  }));
 
   const results = [];
   for (const issue of [...merged.values()].slice(0, limit * 2)) {
