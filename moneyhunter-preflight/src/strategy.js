@@ -1,4 +1,5 @@
-const SOURCE_PRIOR = {
+import { getSourcePriors } from './revenue-memory.js';
+const DEFAULT_SOURCE_PRIOR = {
   frantic: 1.00,
   github: 0.82,
   algora: 0.90,
