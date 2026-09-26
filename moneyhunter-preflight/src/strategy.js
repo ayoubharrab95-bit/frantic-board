@@ -2,7 +2,11 @@ const DEFAULT_SOURCE_PRIOR = {
   frantic: 1.00,
   github: 0.82,
   algora: 0.90,
-  opire: 0.55
+  opire: 0.55,
+  clawlancer: 0.70,
+  mya: 0.72,
+  basedagents: 0.86,
+  taskbounty: 0.88
 };
 
 let SOURCE_PRIOR = { ...DEFAULT_SOURCE_PRIOR };
