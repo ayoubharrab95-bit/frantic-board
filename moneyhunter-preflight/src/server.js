@@ -3,6 +3,7 @@ import { analyzeIssueUrl } from './analyze.js';
 import { runRadar } from './radar.js';
 import { revenueChannels, buildRevenuePortfolio } from './channels.js';
 import { PRICING, PUBLIC_MANIFEST, LLMS_TEXT, OPENAPI } from './product.js';
+import { revenueOffers } from './offers.js';
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
 const port=Number(process.env.PORT||8787);
 const headers=t=>({'content-type':t,'access-control-allow-origin':'*','access-control-allow-headers':'content-type, authorization, payment-signature','access-control-allow-methods':'GET,POST,OPTIONS'});
@@ -19,6 +20,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/openapi.json')return json(res,200,OPENAPI);
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
+ if(req.method==='GET'&&req.url==='/v1/offers')return json(res,200,{generated_at:new Date().toISOString(),offers:revenueOffers()},{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/metrics')return json(res,200,snapshotMetrics(),{'cache-control':'no-store'});
  if(req.method==='POST'&&req.url==='/v1/preflight'){const started=Date.now();try{const p=await readJson(req);if(!p.issue_url){observePreflight({ok:false,latencyMs:Date.now()-started});return json(res,400,{error:'issue_url is required'})}const r=await analyzeIssueUrl(p.issue_url);observePreflight({ok:true,latencyMs:Date.now()-started});return json(res,200,r)}catch(e){observePreflight({ok:false,latencyMs:Date.now()-started});return json(res,422,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url==='/v1/payment-reliability'){try{const p=await readJson(req);if(!p.issue_url){observePaymentCheck({ok:false});return json(res,400,{error:'issue_url is required'})}const r=await analyzeIssueUrl(p.issue_url);observePaymentCheck({ok:true});return json(res,200,{source:r.source,reward:r.reward,payment:r.payment,recommendation:r.recommendation,red_flags:r.red_flags})}catch(e){observePaymentCheck({ok:false});return json(res,422,{error:e instanceof Error?e.message:String(e)})}}
