@@ -1,0 +1,21 @@
+{
+  "name": "bounty-preflight",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Preflight paid GitHub bounties before an AI agent spends compute.",
+  "scripts": {
+    "start": "node src/server.js",
+    "mcp": "node src/mcp.js",
+    "test": "node --test",
+    "check": "node --check src/*.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.0.0"
+  },
+  "license": "MIT"
+}
