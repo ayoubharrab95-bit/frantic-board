@@ -1,0 +1,22 @@
+{
+  "currency": "USD",
+  "network": "base",
+  "tools": {
+    "bounty_preflight": {
+      "price": 0.05,
+      "description": "Full live preflight of one public GitHub bounty."
+    },
+    "opportunity_radar": {
+      "price": 0.10,
+      "description": "Rank current low-competition paid opportunities from supported sources."
+    },
+    "payment_reliability": {
+      "price": 0.03,
+      "description": "Payment/funding credibility signals for a supported opportunity."
+    }
+  },
+  "notes": [
+    "Prices are launch defaults and may be changed without code changes.",
+    "Use testnet before switching paid routes to production."
+  ]
+}
