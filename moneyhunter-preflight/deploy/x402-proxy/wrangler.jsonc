@@ -1,0 +1,12 @@
+{
+  "name": "moneyhunter-x402-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "vars": {
+    "NETWORK": "base-sepolia",
+    "ORIGIN_URL": "https://REPLACE-WITH-YOUR-ORIGIN.example",
+    "PAY_TO": "0xREPLACE_WITH_PUBLIC_EVM_WALLET",
+    "PRICE_PREFLIGHT": "$0.05",
+    "PRICE_RADAR": "$0.10"
+  }
+}
