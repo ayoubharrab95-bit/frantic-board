@@ -6,7 +6,7 @@ const DEFAULT_SOURCE_PRIOR = {
   opire: 0.55
 };
 
-function clamp(value, min=0, max=1) {
+let SOURCE_PRIOR = { ...DEFAULT_SOURCE_PRIOR };\nexport function setSourcePriors(priors={}) { SOURCE_PRIOR = { ...DEFAULT_SOURCE_PRIOR, ...priors }; return SOURCE_PRIOR; }\n\nfunction clamp(value, min=0, max=1) {
   return Math.max(min, Math.min(max, Number(value) || 0));
 }
 
