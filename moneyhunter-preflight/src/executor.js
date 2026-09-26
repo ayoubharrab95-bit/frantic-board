@@ -7,7 +7,7 @@ export function registerExecutor(source,executor){
 
 export function executorStatus(source){
   const adapter=adapters.get(source);
-  return adapter ? {source,available:true,actions:adapter.actions||['execute']} : {source,available:false,actions:[]};
+  return adapter ? {source,available:true,credentialed:typeof adapter.ready==='function'?Boolean(adapter.ready()):true,actions:adapter.actions||['execute']} : {source,available:false,credentialed:false,actions:[]};
 }
 
 export function listExecutors(){
