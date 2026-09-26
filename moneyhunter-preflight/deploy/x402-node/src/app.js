@@ -90,6 +90,8 @@ export function createApp(config = {}) {
   const NETWORK = config.NETWORK || process.env.NETWORK || 'eip155:84532';
   const ORIGIN_URL = config.ORIGIN_URL || process.env.ORIGIN_URL || 'https://moneyhunter-preflight.onrender.com';
   const PAY_TO = config.PAY_TO || process.env.PAY_TO || '';
+  const FACILITATOR_URL =
+    config.FACILITATOR_URL || process.env.FACILITATOR_URL || 'https://facilitator.payai.network';
   const PRICE_PREFLIGHT = config.PRICE_PREFLIGHT || process.env.PRICE_PREFLIGHT || '$0.05';
   const PRICE_RADAR = config.PRICE_RADAR || process.env.PRICE_RADAR || '$0.10';
   const PRICE_PAYMENT_RELIABILITY = config.PRICE_PAYMENT_RELIABILITY || process.env.PRICE_PAYMENT_RELIABILITY || '$0.03';
@@ -122,7 +124,7 @@ export function createApp(config = {}) {
   }));
 
   if (isEvmAddress(PAY_TO)) {
-    const facilitator = new HTTPFacilitatorClient({ url: 'https://x402.org/facilitator' });
+    const facilitator = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
     const resourceServer = new x402ResourceServer(facilitator)
       .register('eip155:84532', new ExactEvmScheme())
       .register('eip155:8453', new ExactEvmScheme());
