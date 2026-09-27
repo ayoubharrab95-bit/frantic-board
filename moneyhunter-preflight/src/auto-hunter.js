@@ -22,23 +22,23 @@ async function huntOnce(){
     const radar=await runRadar({sources,minReward:Number(process.env.AUTO_HUNT_MIN_REWARD||5),limit:Number(process.env.AUTO_HUNT_LIMIT||25),useCache:false});
     for(const [source,status] of Object.entries(radar.source_status||{})) observeSourceStatus(source,status);
     const strategy=await buildStrategyState(radar.strategy?.portfolio||radar.opportunities||[]);
-    const candidates=strategy.ranked_opportunities;
+    const candidates=(strategy.ranked_opportunities||[]).map(item=>({...item,web_automation_available:Boolean(process.env.TINYFISH_API_KEY && (item.raw?.url||item.url||item.external_link||item.raw?.issue_url)),tinyfish_url:item.raw?.url||item.url||item.external_link||item.raw?.issue_url||null}));
     const plan=buildExecutionPlan(candidates);
     const executors=listExecutors(),queued=[],gated=[],ready=[],attempted=[];
     let development=null;
     for(const item of plan){
       if(item.policy?.action==='reject')continue;
       const row=await enqueueOpportunity(item); queued.push(row);
-      if(item.policy?.action==='api_execute'){
+      if(item.policy?.action==='api_execute'||item.policy?.action==='web_execute'){
         const payoutOk=Number(item.payment_confidence ?? 0) >= Number(process.env.AUTO_EXECUTE_MIN_PAYMENT_CONFIDENCE||0.80);
         const noManualPayout=!item.requires_manual_payment;
-        const ex=executors.find(x=>x.source===item.source);
+        const ex=item.policy?.action==='web_execute' ? executors.find(x=>x.source==='tinyfish') : executors.find(x=>x.source===item.source);
         if(ex?.credentialed && payoutOk && noManualPayout){
           ready.push({opportunity:item,row});
           if(process.env.AUTO_EXECUTE_CLAIMS==='true'){
             try{
               const actionBySource={frantic:'claim',taskbounty:'claim_access',clawlancer:'claim',mya:'apply',basedagents:'claim',algora:'claim',opire:'claim'};
-              const action=actionBySource[item.source]||'claim';
+              const action=item.policy?.action==='web_execute'?'web_execute':(actionBySource[item.source]||'claim');
               const result=await executeOpportunity(item,{dryRun:false,action,pr_url:item.raw?.pr_url,issue_number:item.raw?.issue_number});
               attempted.push({id:item.id,source:item.source,result});
               await updateExecution(row.id,{status:result.status||'attempted',last_result:result});
