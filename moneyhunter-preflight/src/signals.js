@@ -80,6 +80,9 @@ export function detectPaymentSignals(title = '', body = '') {
   if (/\b(?:grantfox|algora|frantic|gitcoin|bounty\s*platform)\b.{0,120}\b(?:release|released|paid|payout)\b/i.test(text)) {
     plus(15, 'A named bounty/payment platform is tied to a payout statement.');
   }
+  if (/\b(?:grantfox|algora|frantic|gitcoin)\b.{0,120}\b(?:escrow|escrowed|funded|funding confirmed|locked)\b/i.test(text)) {
+    plus(15, 'A named bounty platform is tied to explicit escrow/funding evidence.');
+  }
 
   if (/\b(proposed reward|bounty proposal|proposed bounty|not an existing award|unfunded|waiting sponsor|funding is being prepared)\b/i.test(text)) {
     minus(55, 'Reward appears proposed, unfunded, or not yet active.');
