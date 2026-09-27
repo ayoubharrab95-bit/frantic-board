@@ -3,12 +3,13 @@ import { listExecutors, executeOpportunity } from './executor.js';
 import { buildExecutionPlan } from './execution-policy.js';
 import { enqueueOpportunity, updateExecution } from './revenue-memory.js';
 import { buildStrategyState } from './strategy-engine.js';
+import { runDevelopmentCycle } from './development-engine.js';
 
 let running=false;
 let timer=null;
 let lastRun=null;
 let lastError=null;
-const DEFAULT_SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty'];
+const DEFAULT_SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty','gitlawbounty'];
 
 async function huntOnce(){
   if(running)return {status:'busy',last_run:lastRun,last_error:lastError};
@@ -21,6 +22,7 @@ async function huntOnce(){
     const candidates=strategy.ranked_opportunities;
     const plan=buildExecutionPlan(candidates);
     const executors=listExecutors(),queued=[],gated=[],ready=[],attempted=[];
+    let development=null;
     for(const item of plan){
       if(item.policy?.action==='reject')continue;
       const row=await enqueueOpportunity(item); queued.push(row);
@@ -45,9 +47,12 @@ async function huntOnce(){
         }else gated.push({source:item.source,id:item.id,reason:!ex?.credentialed?'executor_not_credentialed':!payoutOk?'payment_confidence_below_auto_threshold':'manual_payment'});
       }
     }
-    lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,source_status:radar.source_status};
+    if(ready.length===0 || candidates.length===0 || gated.length>=Math.max(1,plan.length)){
+      development=await runDevelopmentCycle({sourceStatus:radar.source_status,executors});
+    }
+    lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,source_status:radar.source_status,development:development?.result||null};
     console.log(JSON.stringify({event:'auto_hunter_cycle',...lastRun}));
-    return {status:'ok',summary:lastRun,radar,strategy,executors};
+    return {status:'ok',summary:lastRun,radar,strategy,executors,development};
   }catch(error){
     lastError=String(error);
     console.error(JSON.stringify({event:'auto_hunter_error',error:lastError}));
