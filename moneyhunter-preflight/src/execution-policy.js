@@ -11,6 +11,7 @@ export function classifyExecution(item={}){
   if(item.irreversible)return{action:'human_gate',reason:'irreversible_action'};
   if(item.claim_requires_pr && !item.raw?.pr_url)return{action:'prepare',reason:'pr_required_before_claim'};
   if(item.claim_api_available||item.submit_api_available)return{action:'api_execute',reason:'headless_api_available'};
+  if(item.tinyfish_url||item.raw?.tinyfish_goal||item.web_automation_available)return{action:'web_execute',reason:'tinyfish_web_automation'};
   return{action:'prepare',reason:'api_not_confirmed'};
 }
 export function buildExecutionPlan(queue=[]){
