@@ -1,6 +1,10 @@
 name: MoneyHunter Preflight CI
 
 on:
+  push:
+    paths:
+      - 'moneyhunter-preflight/**'
+      - '.github/workflows/moneyhunter-preflight-ci.yml'
   workflow_dispatch:
 
 permissions:
