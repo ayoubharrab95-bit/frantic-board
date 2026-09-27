@@ -1,91 +1,83 @@
 import { makeOpportunity } from '../opportunity.js';
-import { boundedFetch } from './network.js';
 
 const BASE = 'https://gofrantic.com';
 
-export function parseFranticIndex(html = '') {
-  const ids = new Set();
-  const re = /href=["']\/bounties\/(\d+)(?:["'?#/])/gi;
-  let match;
-  while ((match = re.exec(html))) ids.add(match[1]);
-  return [...ids];
+function normalizeRows(board = {}) {
+  return [
+    ...(Array.isArray(board.open_bounties) ? board.open_bounties : []),
+    ...(Array.isArray(board.bounties) ? board.bounties : [])
+  ];
 }
 
-function numberAfter(label, html) {
-  const clean = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  const re = new RegExp(`${label}\\s*(\\d+)`, 'i');
-  const m = clean.match(re);
-  return m ? Number(m[1]) : null;
-}
-
-export function parseFranticBountyPage(id, html = '') {
-  const text = html.replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const titleMatch = text.match(new RegExp(`#${id}\\s+(.+?)(?=\\s+(?:claim|claims|endpoint|requires|ledger|receipts|\\$\\d))`, 'i'));
-  // The page also says "this paid bounty is $10 or less". That number is an
-  // eligibility threshold, not the reward; require the funded price label.
-  const rewardMatch = text.match(/\$\s*([0-9]+(?:\.[0-9]+)?)\s+FUNDED\b/i);
-
-  const available = numberAfter('available', html);
-  const active = numberAfter('active', html);
-
-  let status = 'unknown';
-  if (/claim gate open|ready to work|available\s+\d+\/\d+/i.test(text)) status = 'open';
-  if (/claim gate closed|sold out|no claims available|closed/i.test(text)) status = 'closed';
+function parseRow(row) {
+  const number = row.number ?? row.id ?? row.posting_id;
+  const claim = row.actions?.claim || {};
+  const slots = row.claim_slots || {};
+  const price = Number(row.price_usd ?? row.price ?? 0);
+  const funded = row.funded === true;
+  const claimAvailable = claim.available === true && Number(slots.available ?? 1) > 0;
+  const claimState = String(claim.state || '');
 
   return makeOpportunity({
-    id,
+    id: `frantic-${String(number)}`,
     source: 'frantic',
-    url: `${BASE}/bounties/${id}`,
-    title: titleMatch?.[1]?.trim() || `Frantic bounty #${id}`,
-    reward: rewardMatch ? Number(rewardMatch[1]) : null,
-    currency: rewardMatch ? 'USD' : null,
-    status,
-    available_slots: available,
-    active_claims: active,
+    url: row.url ? (String(row.url).startsWith('http') ? row.url : BASE + row.url) : `${BASE}/bounties/${number}`,
+    title: row.title || `Frantic bounty #${number}`,
+    reward: Number.isFinite(price) ? price : null,
+    currency: 'USD',
+    status: funded && claimAvailable ? 'open' : 'closed',
+    available_slots: Number(slots.available ?? 0),
+    active_claims: Number(slots.occupied ?? 0),
     ai_policy: 'allowed',
+    payment_confidence: funded ? 0.98 : 0.20,
+    competition_score: Math.max(0.05, Math.min(1, Number(slots.available ?? 0) / Math.max(1, Number(slots.capacity ?? 1)))),
+    requires_manual_payment: false,
     claim_api_available: true,
     submit_api_available: true,
-    raw: { text }
+    requires_kyc: claimState === 'requires_identity',
+    raw: {
+      bounty_id: number,
+      funded,
+      work_status: row.work_status ?? null,
+      claim_state: claimState,
+      claim_reason: claim.reason ?? null,
+      claim_slots: slots,
+      api_url: row.api_url ? (String(row.api_url).startsWith('http') ? row.api_url : BASE + row.api_url) : null,
+      visibility: row.visibility ?? 'public'
+    }
   });
 }
 
-async function get(url, fetchImpl = fetch) {
-  const response = await boundedFetch(fetchImpl, url, {
-    headers: { 'user-agent': 'moneyhunter-preflight/0.2' }
+export function parseFranticBoard(board = {}) {
+  const rows = normalizeRows(board);
+  const seen = new Set();
+  const out = [];
+  for (const row of rows) {
+    const key = String(row.number ?? row.id ?? row.posting_id ?? row.url ?? '');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const item = parseRow(row);
+    if (item.reward != null && item.reward >= 0) out.push(item);
+  }
+  return out;
+}
+
+async function getBoard(fetchImpl = fetch) {
+  const response = await fetchImpl(`${BASE}/v1/board`, {
+    headers: { accept: 'application/json', 'user-agent': 'moneyhunter-preflight/0.8' }
   });
-  if (!response.ok) throw new Error(`Frantic HTTP ${response.status} for ${url}`);
-  return response.text();
+  if (!response.ok) throw new Error(`Frantic HTTP ${response.status} for /v1/board`);
+  return response.json();
 }
 
 export async function discoverFrantic({ limit = 20, fetchImpl = fetch } = {}) {
-  const indexHtml = await get(BASE, fetchImpl);
-  const ids = parseFranticIndex(indexHtml).slice(0, limit);
-  const results = [];
-
-  for (const id of ids) {
-    try {
-      const html = await get(`${BASE}/bounties/${id}`, fetchImpl);
-      results.push(parseFranticBountyPage(id, html));
-    } catch (error) {
-      results.push(makeOpportunity({
-        id,
-        source: 'frantic',
-        url: `${BASE}/bounties/${id}`,
-        title: `Frantic bounty #${id}`,
-        status: 'error',
-        ai_policy: 'allowed',
-        raw: { error: error instanceof Error ? error.message : String(error) }
-      }));
-    }
-  }
-
-  return results;
+  const board = await getBoard(fetchImpl);
+  return parseFranticBoard(board)
+    .filter(item => item.status === 'open')
+    .sort((a, b) =>
+      (b.payment_confidence ?? 0) - (a.payment_confidence ?? 0) ||
+      (b.reward ?? 0) - (a.reward ?? 0) ||
+      (b.competition_score ?? 0) - (a.competition_score ?? 0)
+    )
+    .slice(0, limit);
 }
