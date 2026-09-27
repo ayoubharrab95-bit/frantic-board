@@ -32,6 +32,7 @@ function isLikelyPaid(issue) {
 }
 
 export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {}) {
+  resetPaymentVerificationBudget();
   const queries = [
     'is:issue is:open bounty "$"',
     'is:issue is:open reward USDC',
@@ -59,7 +60,11 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
     if (reward.amount == null) continue;
 
     const payment = detectPaymentSignals(issue.title || '', issue.body || '');
+    const verification = payment.score >= 55 && payment.score < 80
+      ? await verifyGitHubPayment(issue.html_url, payment)
+      : { score: payment.score, enriched: false, evidence: [] };
     const ai = detectAiPolicy(issue.title || '', issue.body || '');
+    const paymentScore = Math.max(payment.score, verification.score);
     const repo = repositoryFromApiUrl(issue.repository_url);
 
     results.push(makeOpportunity({
@@ -72,7 +77,7 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
       status: issue.state === 'open' ? 'open' : 'closed',
       active_claims: issue.comments || 0,
       ai_policy: ai.status,
-      payment_confidence: Math.max(0.05, payment.score / 100),
+      payment_confidence: Math.max(0.05, paymentScore / 100),
       competition_score: Math.max(0.05, 1 / (1 + (issue.comments || 0) / 4)),
       requires_manual_payment: !/escrow|funded|algora|frantic|x402|on-chain|USDC/i.test(`${issue.title}\n${issue.body}`),
       raw: {
@@ -80,6 +85,7 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
         created_at: issue.created_at,
         updated_at: issue.updated_at,
         payment_signals: payment,
+        payment_verification: verification,
         ai_policy: ai
       }
     }));
