@@ -29,6 +29,8 @@ export function parseTaskBountyTasks(rows=[]){
       payment_confidence:funded?0.93:0.45,
       competition_score:Math.max(0.08,1/(1+claims)),
       requires_manual_payment:false,
+      claim_api_available:true,
+      submit_api_available:true,
       estimated_minutes:Number(x.estimated_minutes||0)||undefined,
       raw:x
     });
