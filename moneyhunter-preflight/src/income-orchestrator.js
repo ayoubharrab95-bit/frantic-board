@@ -1,5 +1,6 @@
 const clamp=(n,min=0,max=1)=>Math.max(min,Math.min(max,Number(n)||0));
 const ENGINE_DEFS=[
+{id:'zero-capital-commerce',kind:'organic-commerce',automation:.92,repeatability:.95,capital:0,auth:'varies'},
 {id:'bounty-hunter',kind:'work',automation:.95,repeatability:.55,capital:0,auth:true},
 {id:'microservice-hunter',kind:'service',automation:.8,repeatability:.8,capital:0,auth:'varies'},
 {id:'leadforge',kind:'direct-sales',automation:.7,repeatability:.85,capital:0,auth:'varies'},
