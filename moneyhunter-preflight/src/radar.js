@@ -33,7 +33,8 @@ export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=tr
  if(params.sources.includes('clawlancer'))jobs.push(safe('clawlancer',()=>discoverClawlancer({limit:params.limit})));
  if(params.sources.includes('mya'))jobs.push(safe('mya',()=>discoverMya({limit:params.limit})));
  if(params.sources.includes('basedagents'))jobs.push(safe('basedagents',()=>discoverBasedAgents({limit:params.limit})));
- if(params.sources.includes('taskbounty'))jobs.push(safe('taskbounty',()=>discoverTaskBounty({limit:params.limit})));\n if(params.sources.includes('basebounty'))jobs.push(safe('basebounty',()=>discoverBaseBounty({limit:params.limit,minReward:params.minReward})));
+ if(params.sources.includes('taskbounty'))jobs.push(safe('taskbounty',()=>discoverTaskBounty({limit:params.limit})));
+ if(params.sources.includes('basebounty'))jobs.push(safe('basebounty',()=>discoverBaseBounty({limit:params.limit,minReward:params.minReward})));
  const batches=await Promise.all(jobs),found=batches.flatMap(b=>b.items),seen=new Set(),deduped=[];
  for(const item of found){const k=opportunityKey(item);if(seen.has(k))continue;seen.add(k);deduped.push(item);}
  const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward).map(i=>{
