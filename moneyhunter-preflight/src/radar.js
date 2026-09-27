@@ -40,8 +40,7 @@ export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=tr
  const batches=await Promise.all(jobs),found=batches.flatMap(b=>b.items),seen=new Set(),deduped=[];
  for(const item of found){const k=opportunityKey(item);if(seen.has(k))continue;seen.add(k);deduped.push(item);}
  const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward)
-  .filter(i=>Number(i.payment_confidence ?? 0) >= Number(process.env.MIN_PAYMENT_CONFIDENCE||0.35))
-  .filter(i=>!(i.requires_manual_payment && Number(i.payment_confidence ?? 0) < Number(process.env.MANUAL_PAYMENT_MIN_CONFIDENCE||0.55)))
+  .filter(i=>Number(i.payment_confidence ?? 0) >= Number(process.env.MIN_PAYMENT_CONFIDENCE||0.20))
   .map(i=>{
   const payment=normalizedPayment(i),competition=normalizedCompetition(i),ev=expectedValue(i);
   return{...i,expected_value_usd:Number(ev.toFixed(2)),radar_score:Number((ev*Math.max(.25,payment)*Math.max(.25,competition)).toFixed(2)),payment_confidence:Number(payment.toFixed(2)),competition_score:Number(competition.toFixed(2)),economics:enrichEconomics({...i,payment_confidence:payment,competition_score:competition})};
