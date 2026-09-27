@@ -24,6 +24,7 @@ export function parseMyaJobs(rows=[]) {
       payment_confidence:0.72,
       competition_score:Math.max(0.08,1/(1+Number(x.applicants ?? x.claims ?? 0))),
       requires_manual_payment:false,
+      claim_api_available:true,
       raw:x
     });
   }).filter(x=>x.reward>0);
