@@ -17,7 +17,7 @@ export function listExecutors(){
 export async function executeOpportunity(item,{dryRun=true,action,external_link,result_text,transaction_id,content,claim_id,artifact_refs,receipt_ref,summary,pr_url,issue_number,pitch,submission_type}={}){
   const policy=item.policy||{};
   if(policy.action!=='api_execute')return {status:'blocked',reason:policy.reason||'policy_gate'};
-  const adapter=adapters.get(item.source);
+  const adapter=adapters.get(policy.action==='web_execute'?'tinyfish':item.source);
   if(!adapter)return {status:'prepare',reason:'no_executor_adapter',source:item.source};
   if(dryRun)return {status:'ready',source:item.source,actions:adapter.actions||['execute'],credentialed:typeof adapter.ready==='function'?Boolean(adapter.ready()):true};
   return adapter.execute(item,{action,external_link,result_text,transaction_id,content,claim_id,artifact_refs,receipt_ref,summary,pr_url,issue_number,pitch,submission_type});
