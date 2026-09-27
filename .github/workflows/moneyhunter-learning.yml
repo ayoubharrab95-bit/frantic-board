@@ -1,0 +1,36 @@
+name: MoneyHunter learning sync
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+jobs:
+  sync-learning:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: moneyhunter/bounty-preflight-v0
+      - name: Fetch aggregate learning state
+        env:
+          MONEYHUNTER_URL: https://moneyhunter-preflight.onrender.com
+        run: |
+          set -e
+          curl --fail --silent --show-error "$MONEYHUNTER_URL/v1/revenue-memory" -o /tmp/memory.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/memory.json'))
+          priors=d.get('source_priors',{})
+          stats=d.get('by_source',[])
+          open('moneyhunter-preflight/data/source-priors.json','w').write(json.dumps(priors,indent=2,sort_keys=True)+'\n')
+          open('moneyhunter-preflight/data/source-stats.json','w').write(json.dumps(stats,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Commit learned aggregates
+        run: |
+          git config user.name "MoneyHunter Learning Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add moneyhunter-preflight/data/source-priors.json moneyhunter-preflight/data/source-stats.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: persist MoneyHunter learning state"
+          git push origin moneyhunter/bounty-preflight-v0
