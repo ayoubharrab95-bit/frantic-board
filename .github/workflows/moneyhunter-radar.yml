@@ -11,21 +11,30 @@ permissions:
 jobs:
   radar:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Query live paid-opportunity radar
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location             "https://moneyhunter-preflight.onrender.com/v1/radar?min_reward=5&limit=25&sources=frantic,github,algora,opire"             -o radar.json
+          BASE="https://moneyhunter-preflight.onrender.com"
+          curl --fail --silent --show-error --location "$BASE/v1/radar?min_reward=5&limit=50&sources=frantic,github,algora,opire,clawlancer,mya,basedagents,taskbounty" -o radar.json
+          curl --fail --silent --show-error --location "$BASE/v1/market-radar" -o market.json
+          curl --fail --silent --show-error --location -H 'content-type: application/json' -d '{"capitalUsd":5}' "$BASE/v1/capital-plan" -o capital.json
+          curl --fail --silent --show-error --location -H 'content-type: application/json' -d '{"capitalUsd":5}' "$BASE/v1/expansion-plan" -o expansion.json
           python - <<'PY'
           import json
-          from pathlib import Path
-          data = json.loads(Path("radar.json").read_text())
-          print(json.dumps(data, ensure_ascii=False, indent=2)[:50000])
+          for name in ["radar.json","market.json","capital.json","expansion.json"]:
+              print("\n###", name)
+              data=json.load(open(name))
+              print(json.dumps(data, ensure_ascii=False, indent=2)[:50000])
           PY
-      - name: Keep a compact artifact
+      - name: Keep intelligence snapshots
         uses: actions/upload-artifact@v4
         with:
-          name: moneyhunter-radar-${{ github.run_id }}
-          path: radar.json
-          retention-days: 7
+          name: moneyhunter-intelligence-${{ github.run_id }}
+          path: |
+            radar.json
+            market.json
+            capital.json
+            expansion.json
+          retention-days: 14
