@@ -1,9 +1,7 @@
 import crypto from 'node:crypto';
 import { registerExecutor } from './executor.js';
 
-function base64Url(buf) {
-  return Buffer.from(buf).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
+function base64Signature(buf) { return Buffer.from(buf).toString('base64'); }
 function bodyHash(body) {
   return crypto.createHash('sha256').update(body).digest('hex');
 }
@@ -27,7 +25,7 @@ function sign(method, path, timestamp, body, nonce) {
   const message = `${method}:${path}:${timestamp}:${bodyHash(body)}:${nonce}`;
   const signature = crypto.sign(null, Buffer.from(message), key);
   return {
-    authorization: `AgentSig ${pub}:${base64Url(signature)}`,
+    authorization: `AgentSig ${pub}:${base64Signature(signature)}`,
     timestamp: String(timestamp),
     nonce
   };
