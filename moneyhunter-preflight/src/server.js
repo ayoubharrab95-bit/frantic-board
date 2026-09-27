@@ -19,6 +19,9 @@ import { incomeEngines, buildIncomePlan, buildIncomeSnapshot } from './income-or
 import { scoreLead, buildLeadOffer } from './leadforge.js';
 import { apiCatalog, apiEconomics } from './apiforge.js';
 import { scoreCommission } from './commissionforge.js';
+import { scanMarkets } from './market-radar.js';
+import { buildCapitalPlan } from './capital-engine.js';
+import { buildExpansionPlan } from './expansion-engine.js';
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
@@ -38,6 +41,9 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
  if(req.method==='GET'&&req.url==='/v1/income-engines')return json(res,200,{generated_at:new Date().toISOString(),engines:incomeEngines(),plan:buildIncomePlan()},{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/market-radar'){try{return json(res,200,await scanMarkets({}),{'cache-control':'no-store'})}catch(e){return json(res,502,{error:e instanceof Error?e.message:String(e)})}}
+ if(req.method==='POST'&&req.url==='/v1/capital-plan'){try{return json(res,200,buildCapitalPlan(await readJson(req)),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
+ if(req.method==='POST'&&req.url==='/v1/expansion-plan'){try{return json(res,200,buildExpansionPlan(await readJson(req)),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/income-snapshot')return json(res,200,buildIncomeSnapshot({radarCount:0,queueCount:0}),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/apiforge/catalog')return json(res,200,{services:apiCatalog(),economics:apiEconomics(10000)},{'cache-control':'no-store'});
  if(req.method==='POST'&&req.url==='/v1/leadforge/score'){try{return json(res,200,buildLeadOffer(await readJson(req)))}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
