@@ -2,8 +2,8 @@ import { fetchIssueContext } from './github.js';
 import { detectPaymentSignals } from './signals.js';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const MAX_ENRICH_PER_RUN = 3;
-const VERIFICATION_TIMEOUT_MS = 8000;
+const MAX_ENRICH_PER_RUN = 6;
+const VERIFICATION_TIMEOUT_MS = 7000;
 const cache = new Map();
 let enrichmentsThisRun = 0;
 
