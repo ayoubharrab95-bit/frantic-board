@@ -29,7 +29,15 @@ function repositoryFromApiUrl(repositoryUrl = '') {
 
 function requiresSpendingOrWalletAction(text = '') {
   return /\b(?:x402|quote_proof|pay_challenge|wallet.*sign|sign.*relay|transaction fee|gas fee)\b/i.test(text)
-    || /\bpay\s+(?:the|a|returned)\s+(?:x402|challenge|fee|quote)\b/i.test(text);
+    || /\bpay\s+(?:the|a|returned)\s+(?:x402|challenge|fee|quote)\b/i.test(text)
+    || /\b(?:entry\/claim|claim|entry)\s+bond\b/i.test(text)
+    || /\b(?:bond|entry\s+fee)\b[^\n]{0,80}\b(?:USDC|USD|\$)/i.test(text)
+    || /\b(?:USDC|USD|\$)[^\n]{0,80}\b(?:bond|entry\s+fee)\b/i.test(text);
+}
+
+function canonicalSolverReward(text = '') {
+  const m = text.match(/\*\*Solver reward:\*\*\s*([0-9]+(?:\.[0-9]+)?)\s*USDC/i);
+  return m ? Number(m[1]) : null;
 }
 
 function isLikelyPaid(issue) {
@@ -78,7 +86,12 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
 
   const results = [];
   for (const issue of [...merged.values()].slice(0, limit * 2)) {
-    const reward = extractReward(issue.title || '', issue.body || '');
+    const fullText = `${issue.title || ''}\n${issue.body || ''}`;
+    const parsedReward = extractReward(issue.title || '', issue.body || '');
+    const canonicalReward = canonicalSolverReward(fullText);
+    const reward = canonicalReward != null
+      ? { ...parsedReward, amount: canonicalReward, currency: 'USDC' }
+      : parsedReward;
     if (reward.amount == null) continue;
 
     const payment = detectPaymentSignals(issue.title || '', issue.body || '');
@@ -88,7 +101,6 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
     const ai = detectAiPolicy(issue.title || '', issue.body || '');
     const paymentScore = Math.max(payment.score, verification.score);
     const repo = repositoryFromApiUrl(issue.repository_url);
-    const fullText = `${issue.title || ''}\n${issue.body || ''}`;
     const requiresSpending = requiresSpendingOrWalletAction(fullText);
     const paymentClassification = classifyPaymentState({ text: fullText, paymentScore, requiresSpending });
     const paymentState = paymentClassification.state;
