@@ -26,8 +26,21 @@ async function huntOnce(){
     const plan=buildExecutionPlan(candidates);
     const executors=listExecutors(),queued=[],gated=[],ready=[],attempted=[];
     let development=null;
-    for(const item of plan){
-      if(item.policy?.action==='reject')continue;
+    for(const plannedItem of plan){
+      if(plannedItem.policy?.action==='reject')continue;
+      // If the preferred headless API executor is not credentialed, fall back to the
+      // credentialed TinyFish browser executor when the opportunity has a usable URL.
+      // This removes a dead-end where a valid paid opportunity was discovered but
+      // could never execute simply because one source-specific API token was absent.
+      const tinyfish=executors.find(x=>x.source==='tinyfish');
+      const apiExecutor=plannedItem.policy?.action==='api_execute' ? executors.find(x=>x.source===plannedItem.source) : null;
+      const canWebFallback=plannedItem.policy?.action==='api_execute'
+        && !apiExecutor?.credentialed
+        && tinyfish?.credentialed
+        && Boolean(plannedItem.web_automation_available && plannedItem.tinyfish_url);
+      const item=canWebFallback
+        ? {...plannedItem,policy:{action:'web_execute',reason:'tinyfish_fallback_for_uncredentialed_api_executor'}}
+        : plannedItem;
       const row=await enqueueOpportunity(item); queued.push(row);
       if(item.policy?.action==='api_execute'||item.policy?.action==='web_execute'){
         const payoutOk=Number(item.payment_confidence ?? 0) >= Number(process.env.AUTO_EXECUTE_MIN_PAYMENT_CONFIDENCE||0.80);
@@ -53,7 +66,7 @@ async function huntOnce(){
     if(ready.length===0 || candidates.length===0 || gated.length>=Math.max(1,plan.length)){
       development=await runDevelopmentCycle({sourceStatus:radar.source_status,executors});
     }
-    lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,source_status:radar.source_status,source_health:sourceHealth(),development:development?.result||null};
+    lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,gated_reasons:gated,source_status:radar.source_status,source_health:sourceHealth(),development:development?.result||null};
     console.log(JSON.stringify({event:'auto_hunter_cycle',...lastRun}));
     return {status:'ok',summary:lastRun,radar,strategy,executors,development};
   }catch(error){
