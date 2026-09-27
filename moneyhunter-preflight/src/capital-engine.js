@@ -3,7 +3,9 @@ const DEFAULTS = {
   experimentPct: 10,
   workingPct: 20,
   maxSingleRiskPct: 5,
-  minExpectedRoiPct: 8
+  minExpectedRoiPct: 8,
+  minPaymentConfidence: 0.55,
+  minExpectedHourlyUsd: 10
 };
 
 function num(v, fallback=0) {
@@ -25,7 +27,9 @@ export function buildCapitalPlan({ capitalUsd=5, opportunities=[], defaults={} }
     const roi = required > 0 ? expectedProfit / required * 100 : Infinity;
     const score = (Number.isFinite(roi) ? roi : 1000) * Math.max(0.05, num(o.acceptance_probability, 0.5));
     return { ...o, expected_roi_pct: Number.isFinite(roi) ? Number(roi.toFixed(2)) : null, allocation_score: Number(score.toFixed(2)) };
-  }).filter(o => o.expected_roi_pct == null || o.expected_roi_pct >= cfg.minExpectedRoiPct)
+  }).filter(o => (o.expected_roi_pct == null || o.expected_roi_pct >= cfg.minExpectedRoiPct)
+    && num(o.payment_confidence,0) >= cfg.minPaymentConfidence
+    && num(o.economics?.expected_hourly_usd,0) >= cfg.minExpectedHourlyUsd)
     .sort((a,b)=>b.allocation_score-a.allocation_score);
 
   const allocations = [];
@@ -52,7 +56,9 @@ export function buildCapitalPlan({ capitalUsd=5, opportunities=[], defaults={} }
       experiment_pct:cfg.experimentPct,
       working_pct:cfg.workingPct,
       max_single_risk_usd:Number(maxRisk.toFixed(2)),
-      min_expected_roi_pct:cfg.minExpectedRoiPct
+      min_expected_roi_pct:cfg.minExpectedRoiPct,
+      min_payment_confidence:cfg.minPaymentConfidence,
+      min_expected_hourly_usd:cfg.minExpectedHourlyUsd
     },
     allocations,
     guardrails:['planning only','no automatic spending','no private-key custody','irreversible financial actions require human approval']
