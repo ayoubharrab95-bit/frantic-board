@@ -21,6 +21,7 @@ async function huntOnce(){
     const sources=filterAvailableSources(configuredSources);
     const radar=await runRadar({sources,minReward:Number(process.env.AUTO_HUNT_MIN_REWARD||5),limit:Number(process.env.AUTO_HUNT_LIMIT||25),useCache:false});
     for(const [source,status] of Object.entries(radar.source_status||{})) observeSourceStatus(source,status);
+    const zeroCapital=buildZeroCapitalPlan(radar.opportunities||[]);
     const strategy=await buildStrategyState(radar.strategy?.portfolio||radar.opportunities||[]);
     const candidates=(strategy.ranked_opportunities||[]).map(item=>({...item,web_automation_available:Boolean(process.env.TINYFISH_API_KEY && (item.raw?.url||item.url||item.external_link||item.raw?.issue_url)),tinyfish_url:item.raw?.url||item.url||item.external_link||item.raw?.issue_url||null}));
     const plan=buildExecutionPlan(candidates);
@@ -66,9 +67,9 @@ async function huntOnce(){
     if(ready.length===0 || candidates.length===0 || gated.length>=Math.max(1,plan.length)){
       development=await runDevelopmentCycle({sourceStatus:radar.source_status,executors});
     }
-    lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,gated_reasons:gated,source_status:radar.source_status,source_health:sourceHealth(),development:development?.result||null};
+    lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,zero_capital_found:zeroCapital.count,zero_capital_top:zeroCapital.opportunities.slice(0,5),queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,gated_reasons:gated,source_status:radar.source_status,source_health:sourceHealth(),development:development?.result||null};
     console.log(JSON.stringify({event:'auto_hunter_cycle',...lastRun}));
-    return {status:'ok',summary:lastRun,radar,strategy,executors,development};
+    return {status:'ok',summary:lastRun,radar,zero_capital:zeroCapital,strategy,executors,development};
   }catch(error){
     lastError=String(error);
     console.error(JSON.stringify({event:'auto_hunter_error',error:lastError}));
