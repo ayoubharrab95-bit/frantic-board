@@ -3,6 +3,7 @@ import { detectPaymentSignals } from './signals.js';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_ENRICH_PER_RUN = 3;
+const VERIFICATION_TIMEOUT_MS = 8000;
 const cache = new Map();
 let enrichmentsThisRun = 0;
 
@@ -19,7 +20,10 @@ export async function verifyGitHubPayment(issueUrl, initialPayment) {
   if (enrichmentsThisRun >= MAX_ENRICH_PER_RUN) return { score: initialPayment.score, enriched: false, reason: 'run_budget_exhausted', evidence: [] };
   enrichmentsThisRun += 1;
   try {
-    const context = await fetchIssueContext(issueUrl);
+    const context = await Promise.race([
+      fetchIssueContext(issueUrl),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('payment_verification_timeout')), VERIFICATION_TIMEOUT_MS))
+    ]);
     const enriched = detectPaymentSignals('', combinedText(context));
     const value = { score: Math.max(initialPayment.score, enriched.score), enriched: true, evidence: [...new Set([...enriched.positive, ...enriched.warnings])], comments_checked: context.comments?.length || 0, linked_prs_checked: context.linkedPrs?.length || 0 };
     cache.set(issueUrl, { at: now(), value });
