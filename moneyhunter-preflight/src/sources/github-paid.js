@@ -101,6 +101,7 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
       active_claims: issue.comments || 0,
       ai_policy: ai.status,
       payment_confidence: Math.max(0.05, paymentScore / 100),
+      payment_state: paymentState,
       competition_score: Math.max(0.05, 1 / (1 + (issue.comments || 0) / 4)),
       requires_manual_payment: requiresManualPayment,
       requires_spending: requiresSpending,
@@ -110,6 +111,7 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
         updated_at: issue.updated_at,
         payment_signals: payment,
         payment_verification: verification,
+        payment_state: paymentState,
         ai_policy: ai
       }
     }));
