@@ -1,0 +1,3 @@
+const SIGNALS=['website','mobile','cta','offer','contact','localization','ads'];
+export function scoreLead(input={}){const text=JSON.stringify(input).toLowerCase();const signals=Object.fromEntries(SIGNALS.map(k=>[k,Boolean(input[k])||text.includes(k)]));const pain=Object.values(signals).filter(Boolean).length;const fit=input.service_fit||'web-fix';const price=fit==='landing-page'?49:fit==='automation'?49:fit==='api-integration'?79:29;return {fit,pain_signals:pain,signals,offer_price_usd:price,score:Number((pain/7).toFixed(3)),next_action:pain>=2?'prepare_personalized_audit':'skip'};}
+export function buildLeadOffer(lead={}){const s=scoreLead(lead);return {...s,title:s.fit+' quick fix',deliverable:'concise audit + fixed-scope implementation proposal'};}
