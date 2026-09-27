@@ -27,6 +27,11 @@ function repositoryFromApiUrl(repositoryUrl = '') {
   return m?.[1] || null;
 }
 
+function requiresSpendingOrWalletAction(text = '') {
+  return /\b(?:x402|quote_proof|pay_challenge|wallet.*sign|sign.*relay|transaction fee|gas fee)\b/i.test(text)
+    || /\bpay\s+(?:the|a|returned)\s+(?:x402|challenge|fee|quote)\b/i.test(text);
+}
+
 function isLikelyPaid(issue) {
   const text = `${issue.title || ''}\n${issue.body || ''}`;
   return /\b(bounty|reward|paid issue|USDC|USD|\$\s*\d+)\b/i.test(text);
@@ -67,6 +72,9 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
     const ai = detectAiPolicy(issue.title || '', issue.body || '');
     const paymentScore = Math.max(payment.score, verification.score);
     const repo = repositoryFromApiUrl(issue.repository_url);
+    const fullText = `${issue.title || ''}\n${issue.body || ''}`;
+    const requiresSpending = requiresSpendingOrWalletAction(fullText);
+    const requiresManualPayment = requiresSpending || /escrow|funded|algora|frantic|x402|on-chain|USDC/i.test(fullText) === false;
 
     results.push(makeOpportunity({
       id: `gh-${issue.id}`,
@@ -80,7 +88,8 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
       ai_policy: ai.status,
       payment_confidence: Math.max(0.05, paymentScore / 100),
       competition_score: Math.max(0.05, 1 / (1 + (issue.comments || 0) / 4)),
-      requires_manual_payment: !/escrow|funded|algora|frantic|x402|on-chain|USDC/i.test(`${issue.title}\n${issue.body}`),
+      requires_manual_payment: requiresManualPayment,
+      requires_spending: requiresSpending,
       raw: {
         repository: repo,
         created_at: issue.created_at,
