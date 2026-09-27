@@ -7,11 +7,12 @@ import { discoverMya } from './sources/mya.js';
 import { discoverBasedAgents } from './sources/basedagents.js';
 import { discoverTaskBounty } from './sources/taskbounty.js';
 import { discoverBaseBounty } from './sources/basebounty.js';
+import { discoverGitLawBounty } from './sources/gitlawbounty.js';
 import { opportunityKey } from './opportunity.js';
 import { buildStrategyPlan, improvementProposals, enrichEconomics, setSourcePriors } from './strategy.js';
 import { getSourcePriors, enqueueOpportunity } from './revenue-memory.js';
 
-const SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty'];
+const SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty','gitlawbounty'];
 const CACHE_TTL_MS=Number(process.env.RADAR_CACHE_TTL_MS||60000),cache=new Map();
 const clamp=(x)=>Math.max(0,Math.min(1,Number(x)||0));
 function normalizedCompetition(i){if(i.competition_score!=null)return clamp(i.competition_score);return 1/(1+(i.active_claims??0));}
@@ -35,6 +36,7 @@ export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=tr
  if(params.sources.includes('basedagents'))jobs.push(safe('basedagents',()=>discoverBasedAgents({limit:params.limit})));
  if(params.sources.includes('taskbounty'))jobs.push(safe('taskbounty',()=>discoverTaskBounty({limit:params.limit})));
  if(params.sources.includes('basebounty'))jobs.push(safe('basebounty',()=>discoverBaseBounty({limit:params.limit,minReward:params.minReward})));
+ if(params.sources.includes('gitlawbounty'))jobs.push(safe('gitlawbounty',()=>discoverGitLawBounty({limit:params.limit,minReward:params.minReward})));
  const batches=await Promise.all(jobs),found=batches.flatMap(b=>b.items),seen=new Set(),deduped=[];
  for(const item of found){const k=opportunityKey(item);if(seen.has(k))continue;seen.add(k);deduped.push(item);}
  const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward)
