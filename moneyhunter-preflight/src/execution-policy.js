@@ -9,6 +9,7 @@ export function classifyExecution(item={}){
   if(item.requires_kyc)return{action:'human_gate',reason:'kyc'};
   if(item.requires_legal_consent)return{action:'human_gate',reason:'legal_consent'};
   if(item.irreversible)return{action:'human_gate',reason:'irreversible_action'};
+  if(item.claim_requires_pr && !item.raw?.pr_url)return{action:'prepare',reason:'pr_required_before_claim'};
   if(item.claim_api_available||item.submit_api_available)return{action:'api_execute',reason:'headless_api_available'};
   return{action:'prepare',reason:'api_not_confirmed'};
 }
