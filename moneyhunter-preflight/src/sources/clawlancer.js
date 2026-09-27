@@ -23,6 +23,8 @@ function parseRows(rows=[]) {
       payment_confidence:0.82,
       competition_score:Math.max(0.08,1/(1+Number(x.claims ?? x.submissions ?? 0))),
       requires_manual_payment:false,
+      claim_api_available:true,
+      submit_api_available:true,
       raw:{...x, source_text:text}
     });
   }).filter(x=>x.reward>0);
