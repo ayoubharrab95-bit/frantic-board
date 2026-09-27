@@ -23,6 +23,8 @@ function parseTasks(rows=[]) {
       payment_confidence:funded?0.96:0.72,
       competition_score:Math.max(0.08,1/(1+Number(x.claim_count||0))),
       requires_manual_payment:false,
+      claim_api_available:true,
+      submit_api_available:true,
       raw:x
     });
   }).filter(x=>x.reward>0);
