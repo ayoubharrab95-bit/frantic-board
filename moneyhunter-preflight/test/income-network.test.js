@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildIncomePlan, incomeEngines } from '../src/income-orchestrator.js';
+import { scoreLead } from '../src/leadforge.js';
+import { apiEconomics } from '../src/apiforge.js';
+import { scoreCommission } from '../src/commissionforge.js';
+test('income network exposes independent engines',()=>assert.ok(incomeEngines().length>=8));
+test('income plan is sorted',()=>{const p=buildIncomePlan();for(let i=1;i<p.length;i++)assert.ok(p[i-1].priority_score>=p[i].priority_score)});
+test('leadforge detects pain',()=>assert.equal(scoreLead({website:true,mobile:true,cta:false}).next_action,'prepare_personalized_audit'));
+test('apiforge computes usage revenue',()=>assert.equal(apiEconomics(1000)[0].gross_usd,50));
+test('commissionforge rejects disallowed program',()=>assert.equal(scoreCommission({allowed:false}).action,'reject'));
