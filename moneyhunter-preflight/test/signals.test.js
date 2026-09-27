@@ -23,6 +23,13 @@ test('flags proposed/unfunded rewards', () => {
   assert.ok(result.warnings.length > 0);
 });
 
+test('recognizes explicit funded and paid evidence', () => {
+  const paid = detectPaymentSignals('bounty', 'paid: true; payment on merge');
+  assert.ok(paid.score >= 60);
+  const claimants = detectPaymentSignals('bounty', 'multiple distinct claimants have been paid');
+  assert.ok(claimants.score >= 55);
+});
+
 test('detects explicit AI permission', () => {
   const result = detectAiPolicy(
     'Task',

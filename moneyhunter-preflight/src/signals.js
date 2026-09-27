@@ -71,6 +71,15 @@ export function detectPaymentSignals(title = '', body = '') {
   if (/\b(released within|payout within|payment within)\s+\d+\s+(?:hours?|days?)\b/i.test(text)) {
     plus(20, 'A concrete payout window is stated.');
   }
+  if (/\b(?:paid|funded)\s*[:=]\s*true\b/i.test(text)) {
+    plus(30, 'The issue explicitly marks payment/funding as true.');
+  }
+  if (/\bmultiple distinct claimants have been paid\b/i.test(text)) {
+    plus(30, 'The issue explicitly reports multiple paid claimants.');
+  }
+  if (/\b(?:grantfox|algora|frantic|gitcoin|bounty\s*platform)\b.{0,120}\b(?:release|released|paid|payout)\b/i.test(text)) {
+    plus(15, 'A named bounty/payment platform is tied to a payout statement.');
+  }
 
   if (/\b(proposed reward|bounty proposal|proposed bounty|not an existing award|unfunded|waiting sponsor|funding is being prepared)\b/i.test(text)) {
     minus(55, 'Reward appears proposed, unfunded, or not yet active.');
