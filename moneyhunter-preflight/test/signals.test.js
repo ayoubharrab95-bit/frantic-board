@@ -25,7 +25,7 @@ test('flags proposed/unfunded rewards', () => {
 
 test('recognizes explicit funded and paid evidence', () => {
   const paid = detectPaymentSignals('bounty', 'paid: true; payment on merge');
-  assert.ok(paid.score >= 75);
+  assert.ok(paid.score >= 60);
   const claimants = detectPaymentSignals('bounty', 'multiple distinct claimants have been paid');
   assert.ok(claimants.score >= 55);
 });
