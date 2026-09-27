@@ -23,6 +23,7 @@ import { scanMarkets } from './market-radar.js';
 import { buildCapitalPlan } from './capital-engine.js';
 import { buildExpansionPlan } from './expansion-engine.js';
 import { buildStrategyState } from './strategy-engine.js';
+import { buildAutonomyPolicy, autonomyDecision, buildSelfHealingPlan } from './autonomy-engine.js';
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
@@ -42,6 +43,9 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
  if(req.method==='GET'&&req.url==='/v1/income-engines')return json(res,200,{generated_at:new Date().toISOString(),engines:incomeEngines(),plan:buildIncomePlan()},{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/autonomy-policy')return json(res,200,buildAutonomyPolicy(),{'cache-control':'no-store'});
+ if(req.method==='POST'&&req.url==='/v1/autonomy-decision'){try{return json(res,200,autonomyDecision((await readJson(req)).action,(await readJson(req))))}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
+ if(req.method==='POST'&&req.url==='/v1/self-healing-plan'){try{const p=await readJson(req);return json(res,200,buildSelfHealingPlan(p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/strategy-state'){try{const radar=await runRadar(parseRadarQuery('/'));return json(res,200,await buildStrategyState(radar.opportunities||radar.strategy?.portfolio||[]),{'cache-control':'no-store'})}catch(e){return json(res,502,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/market-radar'){try{return json(res,200,await scanMarkets({}),{'cache-control':'no-store'})}catch(e){return json(res,502,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url==='/v1/capital-plan'){try{return json(res,200,buildCapitalPlan(await readJson(req)),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
