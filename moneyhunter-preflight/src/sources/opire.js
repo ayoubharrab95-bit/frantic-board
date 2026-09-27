@@ -59,6 +59,8 @@ export function parseOpireHome(html = '') {
       payment_confidence: 0.25 * suspiciousScale,
       competition_score: Math.max(0.05, 1 / (1 + solvers)),
       requires_manual_payment: true,
+      claim_api_available: true,
+      claim_requires_pr: true,
       raw: {
         owner,
         repo,
