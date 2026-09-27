@@ -62,6 +62,8 @@ export function parseAlgoraOrg(handle, html = '') {
       payment_confidence: 0.82,
       competition_score: Math.max(0.04, 1 / (1 + claims / 3)),
       requires_manual_payment: false,
+      claim_api_available: true,
+      claim_requires_pr: true,
       raw: { org: handle, repo, issue_number: Number(issue), claims }
     }));
   }
