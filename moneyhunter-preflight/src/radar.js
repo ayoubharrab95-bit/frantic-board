@@ -37,12 +37,17 @@ export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=tr
  if(params.sources.includes('basebounty'))jobs.push(safe('basebounty',()=>discoverBaseBounty({limit:params.limit,minReward:params.minReward})));
  const batches=await Promise.all(jobs),found=batches.flatMap(b=>b.items),seen=new Set(),deduped=[];
  for(const item of found){const k=opportunityKey(item);if(seen.has(k))continue;seen.add(k);deduped.push(item);}
- const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward).map(i=>{
+ const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward)
+  .filter(i=>Number(i.payment_confidence ?? 0) >= Number(process.env.MIN_PAYMENT_CONFIDENCE||0.35))
+  .filter(i=>!(i.requires_manual_payment && Number(i.payment_confidence ?? 0) < Number(process.env.MANUAL_PAYMENT_MIN_CONFIDENCE||0.55)))
+  .map(i=>{
   const payment=normalizedPayment(i),competition=normalizedCompetition(i),ev=expectedValue(i);
   return{...i,expected_value_usd:Number(ev.toFixed(2)),radar_score:Number((ev*Math.max(.25,payment)*Math.max(.25,competition)).toFixed(2)),payment_confidence:Number(payment.toFixed(2)),competition_score:Number(competition.toFixed(2)),economics:enrichEconomics({...i,payment_confidence:payment,competition_score:competition})};
  }).filter(i=>i.expected_value_usd>0).sort((a,b)=>b.economics.expected_hourly_usd-a.economics.expected_hourly_usd||b.radar_score-a.radar_score||b.expected_value_usd-a.expected_value_usd).slice(0,params.limit);
- const sourceStatus=Object.fromEntries(batches.map(b=>[b.label,b.error?{ok:false,error:b.error}:{ok:true,found:b.items.length}])),strategy=buildStrategyPlan({opportunities,sourceStatus});
+ const sourceStatus=Object.fromEntries(batches.map(b=>[b.label,b.error?{ok:false,error:b.error}:{ok:true,found:b.items.length}])),
+  weakSources=Object.entries(sourceStatus).filter(([,s])=>!s.ok||s.found===0).map(([name,s])=>({source:name,action:s.ok?'expand_discovery':'repair_or_deprioritize',reason:s.error||'source returned no qualifying opportunities'})),strategy=buildStrategyPlan({opportunities,sourceStatus});
  if(process.env.AUTO_QUEUE_OPPORTUNITIES==='true'){for(const item of strategy.portfolio){try{await enqueueOpportunity(item)}catch{}}}
+ strategy.source_actions=[...(strategy.source_actions||[]),...weakSources];
  const value={generated_at:new Date().toISOString(),strategy_revision:strategy.strategy_revision,requested_sources:params.sources,source_status:sourceStatus,count:opportunities.length,opportunities,strategy,improvement_proposals:improvementProposals({sourceStatus,opportunities}),cached:false};
  cache.set(key,{at:Date.now(),value});return value;
 }
