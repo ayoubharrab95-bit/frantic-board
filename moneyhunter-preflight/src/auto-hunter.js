@@ -25,7 +25,7 @@ async function huntOnce(){
           ready.push({opportunity:item,row});
           if(process.env.AUTO_EXECUTE_CLAIMS==='true'){
             try{
-              const result=await executeOpportunity(item,{dryRun:false,action:'claim_access'});
+              const result=await executeOpportunity(item,{dryRun:false,action:item.source==='clawlancer'?'claim':'claim_access'});
               await updateExecution(row.id,{status:result.status||'attempted',last_result:result});
             }catch(error){
               await updateExecution(row.id,{status:'error',last_error:String(error)});
