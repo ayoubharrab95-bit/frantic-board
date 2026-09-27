@@ -1,5 +1,6 @@
 import { makeOpportunity } from '../opportunity.js';
 import { extractReward, detectAiPolicy, detectPaymentSignals } from '../signals.js';
+import { verifyGitHubPayment, resetPaymentVerificationBudget } from '../payment-verifier.js';
 import { boundedFetch } from './network.js';
 
 const API = 'https://api.github.com';
