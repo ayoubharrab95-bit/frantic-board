@@ -20,8 +20,10 @@ async function huntOnce(){
       if(item.policy?.action==='reject')continue;
       const row=await enqueueOpportunity(item); queued.push(row);
       if(item.policy?.action==='api_execute'){
+        const payoutOk=Number(item.payment_confidence ?? 0) >= Number(process.env.AUTO_EXECUTE_MIN_PAYMENT_CONFIDENCE||0.80);
+        const noManualPayout=!item.requires_manual_payment;
         const ex=executors.find(x=>x.source===item.source);
-        if(ex?.credentialed){
+        if(ex?.credentialed && payoutOk && noManualPayout){
           ready.push({opportunity:item,row});
           if(process.env.AUTO_EXECUTE_CLAIMS==='true'){
             try{
@@ -33,7 +35,7 @@ async function huntOnce(){
               await updateExecution(row.id,{status:'error',last_error:String(error)});
             }
           }
-        }else gated.push({source:item.source,id:item.id,reason:'executor_not_credentialed'});
+        }else gated.push({source:item.source,id:item.id,reason:!ex?.credentialed?'executor_not_credentialed':!payoutOk?'payment_confidence_below_auto_threshold':'manual_payment'});
       }
     }
     lastRun={at:new Date().toISOString(),found:radar.count,queued:queued.length,ready:ready.length,gated:gated.length,source_status:radar.source_status};
