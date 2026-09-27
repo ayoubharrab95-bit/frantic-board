@@ -10,7 +10,9 @@ import { buildExecutionPlan } from './execution-policy.js';
 import { listExecutors, executorStatus, executeOpportunity } from './executor.js';
 import { registerTaskBountyExecutor } from './executors-taskbounty.js';
 import { registerClawlancerExecutor } from './executors-clawlancer.js';
+import { startAutoHunter, huntOnce } from './auto-hunter.js';
 registerTaskBountyExecutor(); registerClawlancerExecutor();
+const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
 const port=Number(process.env.PORT||8787);
 const headers=t=>({'content-type':t,'access-control-allow-origin':'*','access-control-allow-headers':'content-type, authorization, payment-signature','access-control-allow-methods':'GET,POST,OPTIONS'});
@@ -29,7 +31,8 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
  if(req.method==='GET'&&req.url==='/v1/revenue-plan')return json(res,200,{generated_at:new Date().toISOString(),lanes:revenueLanes(),plan:buildRevenuePlan()},{'cache-control':'public, max-age=120'});
   if(req.method==='POST'&&req.url==='/v1/execution/run'){const token=process.env.MEMORY_WRITE_TOKEN;if(!token||req.headers.authorization!==`Bearer ${token}`)return json(res,403,{error:'execution_disabled_or_unauthorized'});try{const p=await readJson(req);return json(res,200,{result:await executeOpportunity(p,{dryRun:false,action:p.action,external_link:p.external_link,result_text:p.result_text,transaction_id:p.transaction_id,content:p.content})})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}} 
- if(req.method==='GET'&&req.url==='/v1/executors')return json(res,200,{executors:listExecutors()},{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/executors')return json(res,200,{executors:listExecutors(),auto_hunter:autoHunter},{'cache-control':'no-store'});
+ if(req.method==='POST'&&req.url==='/v1/hunt'){const token=process.env.MEMORY_WRITE_TOKEN;if(!token||req.headers.authorization!==`Bearer ${token}`)return json(res,403,{error:'hunt_disabled_or_unauthorized'});try{return json(res,200,await huntOnce())}catch(e){return json(res,502,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url==='/v1/execution/preview'){try{const p=await readJson(req);return json(res,200,await executeOpportunity({...p,policy:buildExecutionPlan([p])[0]?.policy},{dryRun:true}))}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/execution-queue')return json(res,200,{queue:buildExecutionPlan(executionQueue(await readLedger()))},{'cache-control':'no-store'});
  if(req.method==='POST'&&req.url==='/v1/execution-queue'){const token=process.env.MEMORY_WRITE_TOKEN;if(!token||req.headers.authorization!==`Bearer ${token}`)return json(res,403,{error:'queue_write_disabled_or_unauthorized'});try{const p=await readJson(req);return json(res,201,{execution:await enqueueOpportunity(p)})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
