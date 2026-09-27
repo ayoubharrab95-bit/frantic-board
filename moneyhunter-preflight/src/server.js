@@ -15,6 +15,10 @@ import { registerMyaExecutor } from './executors-mya.js';
 import { registerBasedAgentsExecutor } from './executors-basedagents.js';
 import { registerGitHubClaimExecutors } from './executors-github-claims.js';
 import { startAutoHunter, huntOnce } from './auto-hunter.js';
+import { incomeEngines, buildIncomePlan, buildIncomeSnapshot } from './income-orchestrator.js';
+import { scoreLead, buildLeadOffer } from './leadforge.js';
+import { apiCatalog, apiEconomics } from './apiforge.js';
+import { scoreCommission } from './commissionforge.js';
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
@@ -33,6 +37,11 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/openapi.json')return json(res,200,OPENAPI);
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
+ if(req.method==='GET'&&req.url==='/v1/income-engines')return json(res,200,{generated_at:new Date().toISOString(),engines:incomeEngines(),plan:buildIncomePlan()},{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/income-snapshot')return json(res,200,buildIncomeSnapshot({radarCount:0,queueCount:0}),{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/apiforge/catalog')return json(res,200,{services:apiCatalog(),economics:apiEconomics(10000)},{'cache-control':'no-store'});
+ if(req.method==='POST'&&req.url==='/v1/leadforge/score'){try{return json(res,200,buildLeadOffer(await readJson(req)))}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
+ if(req.method==='POST'&&req.url==='/v1/commissionforge/score'){try{return json(res,200,scoreCommission(await readJson(req)))}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/revenue-plan')return json(res,200,{generated_at:new Date().toISOString(),lanes:revenueLanes(),plan:buildRevenuePlan()},{'cache-control':'public, max-age=120'});
   if(req.method==='POST'&&req.url==='/v1/execution/run'){const token=process.env.MEMORY_WRITE_TOKEN;if(!token||req.headers.authorization!==`Bearer ${token}`)return json(res,403,{error:'execution_disabled_or_unauthorized'});try{const p=await readJson(req);return json(res,200,{result:await executeOpportunity(p,{dryRun:false,action:p.action,external_link:p.external_link,result_text:p.result_text,transaction_id:p.transaction_id,content:p.content,claim_id:p.claim_id,artifact_refs:p.artifact_refs,receipt_ref:p.receipt_ref,summary:p.summary,pr_url:p.pr_url,issue_number:p.issue_number,pitch:p.pitch,submission_type:p.submission_type})})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}} 
  if(req.method==='GET'&&req.url==='/v1/executors')return json(res,200,{executors:listExecutors(),auto_hunter:autoHunter},{'cache-control':'no-store'});
