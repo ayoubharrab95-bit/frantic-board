@@ -10,10 +10,10 @@ const DEFAULT_COOLDOWNS = {
 
 function classify(sourceStatus={}) {
   const error = String(sourceStatus.error || '').toLowerCase();
-  if (/\\b402\\b|payment|subscription|billing/.test(error)) return 'auth_or_payment';
-  if (/\\b401\\b|\\b403\\b|credential|login|auth/.test(error)) return 'auth_or_payment';
-  if (/\\b429\\b|rate.?limit/.test(error)) return 'rate_limit';
-  if (/\\b5\\d\\d\\b|server error|bad gateway|service unavailable/.test(error)) return 'server_error';
+  if (/\b402\b|payment|subscription|billing/.test(error)) return 'auth_or_payment';
+  if (/\b401\b|\b403\b|credential|login|auth/.test(error)) return 'auth_or_payment';
+  if (/\b429\b|rate.?limit/.test(error)) return 'rate_limit';
+  if (/\b5\d\d\b|server error|bad gateway|service unavailable/.test(error)) return 'server_error';
   if (/timeout|network|econn|fetch failed/.test(error)) return 'network';
   return 'network';
 }
