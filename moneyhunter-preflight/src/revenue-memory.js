@@ -6,7 +6,7 @@ const LEDGER = path.join(DATA_DIR, 'revenue-ledger.json');
 const SOURCE_PRIOR_FILE = path.join(DATA_DIR, 'source-priors.json');
 
 const DEFAULT_PRIORS = {
-  frantic:1, github:.82, algora:.90, opire:.55, clawlancer:.70, mya:.72, basedagents:.86, taskbounty:.88
+  frantic:1, github:.82, algora:.90, opire:.55, clawlancer:.70, mya:.72, basedagents:.86, taskbounty:.88, basebounty:.70, gitlawbounty:.65
 };
 
 async function readJson(file,fallback){
