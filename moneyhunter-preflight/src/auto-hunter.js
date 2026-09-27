@@ -6,7 +6,7 @@ import { enqueueOpportunity, updateExecution } from './revenue-memory.js';
 let running=false;
 let timer=null;
 let lastRun=null;
-const DEFAULT_SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty'];
+const DEFAULT_SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty'];
 
 async function huntOnce(){
   if(running)return {status:'busy',last_run:lastRun};
