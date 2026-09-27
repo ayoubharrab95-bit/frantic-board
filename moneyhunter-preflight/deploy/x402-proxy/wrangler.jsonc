@@ -1,0 +1,13 @@
+{
+  "name": "moneyhunter-x402-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "vars": {
+    "NETWORK": "eip155:84532",
+    "ORIGIN_URL": "https://moneyhunter-preflight.onrender.com",
+    "PAY_TO": "0xREPLACE_WITH_PUBLIC_EVM_WALLET",
+    "PRICE_PREFLIGHT": "$0.05",
+    "PRICE_RADAR": "$0.10",
+    "PRICE_PAYMENT_RELIABILITY": "$0.03"
+  }
+}
