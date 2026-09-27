@@ -25,7 +25,9 @@ async function huntOnce(){
           ready.push({opportunity:item,row});
           if(process.env.AUTO_EXECUTE_CLAIMS==='true'){
             try{
-              const result=await executeOpportunity(item,{dryRun:false,action:item.source==='clawlancer'?'claim':'claim_access'});
+              const actionBySource={frantic:'claim',taskbounty:'claim_access',clawlancer:'claim',mya:'apply',basedagents:'claim',algora:'claim',opire:'claim'};
+              const action=actionBySource[item.source]||'claim';
+              const result=await executeOpportunity(item,{dryRun:false,action,pr_url:item.raw?.pr_url,issue_number:item.raw?.issue_number});
               await updateExecution(row.id,{status:result.status||'attempted',last_result:result});
             }catch(error){
               await updateExecution(row.id,{status:'error',last_error:String(error)});
