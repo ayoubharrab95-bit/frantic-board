@@ -1,6 +1,7 @@
 const VENUES = [
   { name: 'binance', url: 'https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT', fee: 0.001 },
-  { name: 'kraken', url: 'https://api.kraken.com/0/public/Ticker?pair={kraken}', fee: 0.0026 }
+  { name: 'kraken', url: 'https://api.kraken.com/0/public/Ticker?pair={kraken}', fee: 0.0026 },
+  { name: 'okx', url: 'https://www.okx.com/api/v5/market/ticker?instId={symbol}-USDT', fee: 0.0010 }
 ];
 
 const ASSETS = [
@@ -18,6 +19,7 @@ async function getJson(url) {
 async function quote(venue, asset) {
   const data = await getJson(venue.url.replace('{symbol}', asset.symbol).replace('{kraken}', asset.kraken));
   if (venue.name === 'binance') return Number(data.price);
+  if (venue.name === 'okx') return Number(data.data?.[0]?.last);
   const key = Object.keys(data.result || {})[0];
   const last = data.result?.[key]?.c?.[0];
   return Number(last);
