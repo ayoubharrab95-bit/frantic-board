@@ -25,6 +25,7 @@ import { buildExpansionPlan } from './expansion-engine.js';
 import { buildStrategyState } from './strategy-engine.js';
 import { buildAutonomyPolicy, autonomyDecision, buildSelfHealingPlan } from './autonomy-engine.js';
 import { buildDevelopmentPlan, runDevelopmentCycle, developmentStatus } from './development-engine.js';
+import { sourceHealth } from './source-health.js';
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
@@ -46,6 +47,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/v1/income-engines')return json(res,200,{generated_at:new Date().toISOString(),engines:incomeEngines(),plan:buildIncomePlan()},{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/autonomy-policy')return json(res,200,buildAutonomyPolicy(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/development-status')return json(res,200,developmentStatus(),{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/source-health')return json(res,200,{generated_at:new Date().toISOString(),sources:sourceHealth()},{'cache-control':'no-store'});
  if(req.method==='POST'&&req.url==='/v1/development-plan'){try{const p=await readJson(req);return json(res,200,await buildDevelopmentPlan(p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url==='/v1/development-cycle'){try{const p=await readJson(req);return json(res,200,await runDevelopmentCycle(p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url==='/v1/autonomy-decision'){try{const p=await readJson(req);return json(res,200,autonomyDecision(p.action,p))}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
