@@ -51,6 +51,8 @@ export function parseFranticBountyPage(id, html = '') {
     available_slots: available,
     active_claims: active,
     ai_policy: 'allowed',
+    claim_api_available: true,
+    submit_api_available: true,
     raw: { text }
   });
 }
