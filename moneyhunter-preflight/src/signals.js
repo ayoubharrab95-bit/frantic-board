@@ -62,6 +62,16 @@ export function detectPaymentSignals(title = '', body = '') {
     plus(10, 'Payment evidence language is present.');
   }
 
+  if (/\b(due for payment|payment due|payment is due|payment scheduled|scheduled for payment)\b/i.test(text)) {
+    plus(35, 'The task explicitly states that payment is due or scheduled.');
+  }
+  if (/\b(paid on merge|payment on merge|paid when merged|payout on merge|logged on merge)\b/i.test(text)) {
+    plus(20, 'The payout trigger is explicitly tied to merge/completion.');
+  }
+  if (/\b(released within|payout within|payment within)\s+\d+\s+(?:hours?|days?)\b/i.test(text)) {
+    plus(20, 'A concrete payout window is stated.');
+  }
+
   if (/\b(proposed reward|bounty proposal|proposed bounty|not an existing award|unfunded|waiting sponsor|funding is being prepared)\b/i.test(text)) {
     minus(55, 'Reward appears proposed, unfunded, or not yet active.');
   }
