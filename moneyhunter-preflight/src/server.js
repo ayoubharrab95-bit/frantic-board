@@ -29,6 +29,7 @@ import { buildDevelopmentPlan, runDevelopmentCycle, developmentStatus } from './
 import { sourceHealth } from './source-health.js';
 import { buildZeroCapitalPlan, buildCommerceOffers } from './zero-capital-engine.js';
 import { treasuryStatus, treasuryPolicy } from './treasury.js';
+import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors(); registerTinyFishExecutor();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
@@ -51,6 +52,9 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/v1/autonomy-policy')return json(res,200,buildAutonomyPolicy(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/development-status')return json(res,200,developmentStatus(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/source-health')return json(res,200,{generated_at:new Date().toISOString(),sources:sourceHealth()},{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/payouts')return json(res,200,await payoutOverview(),{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/payouts/registry')return json(res,200,{routes:payoutRegistry()},{'cache-control':'no-store'});
+ if(req.method==='POST'&&req.url==='/v1/payouts/route'){try{const p=await readJson(req);return json(res,200,payoutRoute(p.source,p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/treasury')return json(res,200,await treasuryStatus(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/treasury/policy')return json(res,200,treasuryPolicy(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/zero-capital-plan'){try{const radar=await runRadar({...parseRadarQuery('/'),minReward:0});return json(res,200,buildZeroCapitalPlan(radar.opportunities||[]),{'cache-control':'no-store'})}catch(e){return json(res,502,{error:e instanceof Error?e.message:String(e)})}}
