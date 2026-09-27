@@ -37,6 +37,22 @@ function isLikelyPaid(issue) {
   return /\b(bounty|reward|paid issue|USDC|USD|\$\s*\d+)\b/i.test(text);
 }
 
+export function classifyPaymentState({ text = '', paymentScore = 0, requiresSpending = false } = {}) {
+  const explicitManualPayment = /\b(?:manual(?:ly)?\s+(?:pay|payout|payment)|payment\s+(?:must|will)\s+be\s+manual|invoice\s+(?:required|needed)|bank\s+transfer\s+after\s+(?:acceptance|merge)|contact\s+(?:the\s+)?maintainer\s+(?:for|about)\s+payment)\b/i.test(text);
+  const hasEscrow = /\b(?:escrow(?:ed)?|funded[- ]live|funding confirmed|escrow locked|fully funded)\b/i.test(text);
+  const hasAutomaticTrigger = /\b(?:paid on merge|payment on merge|paid when merged|payout on merge|logged on merge|auto(?:matic)?(?:ally)?\s+(?:pay|payout|payment)|payout within\s+\d+\s+(?:hours?|days?))\b/i.test(text);
+  const state = requiresSpending
+    ? 'spending_required'
+    : explicitManualPayment
+      ? 'manual'
+      : hasEscrow
+        ? 'escrow'
+        : hasAutomaticTrigger || paymentScore >= 80
+          ? 'strong'
+          : 'unknown';
+  return { state, requiresManualPayment: explicitManualPayment || requiresSpending };
+}
+
 export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {}) {
   resetPaymentVerificationBudget();
   const queries = [
@@ -74,21 +90,9 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
     const repo = repositoryFromApiUrl(issue.repository_url);
     const fullText = `${issue.title || ''}\n${issue.body || ''}`;
     const requiresSpending = requiresSpendingOrWalletAction(fullText);
-    const explicitManualPayment = /\b(?:manual(?:ly)?\s+(?:pay|payout|payment)|payment\s+(?:must|will)\s+be\s+manual|invoice\s+(?:required|needed)|bank\s+transfer\s+after\s+(?:acceptance|merge)|contact\s+(?:the\s+)?maintainer\s+(?:for|about)\s+payment)\b/i.test(fullText);
-    const hasEscrow = /\b(?:escrow(?:ed)?|funded[- ]live|funding confirmed|escrow locked|fully funded)\b/i.test(fullText);
-    const hasAutomaticTrigger = /\b(?:paid on merge|payment on merge|paid when merged|payout on merge|logged on merge|auto(?:matic)?(?:ally)?\s+(?:pay|payout|payment)|payout within\s+\d+\s+(?:hours?|days?))\b/i.test(fullText);
-    const paymentState = requiresSpending
-      ? 'spending_required'
-      : explicitManualPayment
-        ? 'manual'
-        : hasEscrow
-          ? 'escrow'
-          : hasAutomaticTrigger || paymentScore >= 80
-            ? 'strong'
-            : 'unknown';
-    // Unknown payment is a discovery state, not a manual-payment requirement.
-    // Only explicit manual payout instructions or user-funded actions create a hard gate.
-    const requiresManualPayment = explicitManualPayment || requiresSpending;
+    const paymentClassification = classifyPaymentState({ text: fullText, paymentScore, requiresSpending });
+    const paymentState = paymentClassification.state;
+    const requiresManualPayment = paymentClassification.requiresManualPayment;
 
     results.push(makeOpportunity({
       id: `gh-${issue.id}`,
