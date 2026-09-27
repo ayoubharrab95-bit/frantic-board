@@ -14,7 +14,8 @@ const CHANNELS=[
 {id:'moneyhunter-api',type:'api',status:'live',automation:'high',payment:'x402',repeatability:'high',requires_spend:false,requires_auth:false,notes:'Machine-to-machine paid preflight, radar and payment-reliability tools on Base mainnet.'},
 {id:'reusable-assets',type:'product',status:'ready',automation:'high',payment:'marketplace-dependent',repeatability:'very-high',requires_spend:false,requires_auth:'varies',notes:'Sell reusable MCP tools, templates and small developer utilities derived from validated internal components.'},
 {id:'sponsorships-grants',type:'grant',status:'watch',automation:'low',payment:'mixed',repeatability:'low',requires_spend:false,requires_auth:'varies',notes:'Monitor legitimate open-source grants and agent-building programs; do not treat prize pools as guaranteed income.'}
-,{id:'basebounty',type:'bounty',status:'integrated',automation:'high',payment:'onchain-usdc',repeatability:'high',requires_spend:false,requires_auth:true,notes:'Base USDC bounties; discovery is read-only, signing and gas remain human-gated.'}];
+,{id:'basebounty',type:'bounty',status:'integrated',automation:'high',payment:'onchain-usdc',repeatability:'high',requires_spend:false,requires_auth:true,notes:'Base USDC bounties; discovery is read-only, signing and gas remain human-gated.'},
+{id:'gitlawbounty',type:'bounty',status:'integrated',automation:'high',payment:'onchain',repeatability:'high',requires_spend:false,requires_auth:false,notes:'GitLaw bounty API discovery; verify canonical bounty state and funding before execution.'}];
 const BLOCKED_PATTERNS=[/private key/i,/seed phrase/i,/recovery phrase/i,/wallet signature/i,/pay gas/i,/buy .*usdc/i,/deposit/i,/kyc/i,/legal agreement/i];
 export function revenueChannels(){return CHANNELS.map(x=>({...x}));}
 export function channelPolicy(channel){
