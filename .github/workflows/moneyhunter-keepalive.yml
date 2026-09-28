@@ -2,13 +2,21 @@ name: MoneyHunter Keepalive
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
-  ping:
+  keepalive:
     runs-on: ubuntu-latest
     steps:
       - name: Wake MoneyHunter
         run: |
-          curl --fail --silent --show-error --max-time 120             https://moneyhunter-preflight.onrender.com/health
+          set -e
+          for i in 1 2 3; do
+            if curl --fail --silent --show-error --max-time 45 https://moneyhunter-preflight.onrender.com/health; then
+              echo
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
