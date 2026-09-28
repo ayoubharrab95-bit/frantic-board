@@ -4,6 +4,8 @@ export function classifyExecution(item={}){
   if(item.requires_manual_payment)return{action:'human_gate',reason:'manual_payment'};
   if(item.requires_login)return{action:'human_gate',reason:'login'};
   if(item.requires_2fa)return{action:'human_gate',reason:'2fa'};
+  if(item.source==='bountybook' && item.requires_wallet_signature && item.claim_api_available && process.env.BOUNTYBOOK_AGENT_PRIVATE_KEY)return{action:'api_execute',reason:'agent_wallet_signing_available'};
+  if(item.requires_2fa)return{action:'human_gate',reason:'2fa'};
   if(item.requires_wallet_signature)return{action:'human_gate',reason:'wallet_signature'};
   if(item.requires_spending)return{action:'human_gate',reason:'spending'};
   if(item.requires_kyc)return{action:'human_gate',reason:'kyc'};
