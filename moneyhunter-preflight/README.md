@@ -197,7 +197,7 @@ This keeps the system productive even when bounty boards are quiet.
 
 ### MONEY MODE (v0.6)
 
-The default hunting mode is now crypto-first and payout-gated. An opportunity is eligible for automatic execution only when its payout is explicitly verified as receivable by the configured public EVM treasury address (MetaMask-compatible), has sufficient payment confidence, and does not require spending or a wallet signature. MetaMask supports Base and other EVM networks; MoneyHunter currently uses Base USDC as its first-class payout rail and records confirmed income separately from pending/expected value. citeturn1search0turn1search9
+The default hunting mode is now crypto-first and payout-gated. An opportunity is eligible for automatic execution only when its payout is explicitly verified as receivable by the configured public EVM treasury address (MetaMask-compatible), has sufficient payment confidence, and does not require spending or a wallet signature. MetaMask supports Base and other EVM networks; MoneyHunter currently uses Base USDC as its first-class payout rail and records confirmed income separately from pending/expected value.
 
 Set only the public receiving address:
 
