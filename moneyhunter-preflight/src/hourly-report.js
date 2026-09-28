@@ -1,8 +1,12 @@
 import { readLedger, revenueMemorySummary } from './revenue-memory.js';
+
 let lastReport=null;
 let timer=null;
 
-function money(ledger, predicate){return ledger.filter(predicate).reduce((n,r)=>n+Math.max(0,Number(r.payout_usd||r.reward_usd||0)),0);}
+function money(ledger, predicate){
+  return ledger.filter(predicate).reduce((n,r)=>n+Math.max(0,Number(r.payout_usd||r.reward_usd||0)),0);
+}
+
 export async function buildHourlyReport(extra={}){
   const ledger=await readLedger();
   const since=Date.now()-60*60*1000;
@@ -22,7 +26,19 @@ export async function buildHourlyReport(extra={}){
     source_memory:(await revenueMemorySummary()).by_source,
     notes:['Confirmed income is based only on recorded paid outcomes; pending/expected values are not counted as earnings.']
   };
-  lastReport=report; return report;
+  lastReport=report;
+  return report;
 }
-export function startHourlyReport(getStats=()=>({})){if(timer)return{enabled:true};timer=setInterval(()=>buildHourlyReport(getStats()).then(r=>console.log(JSON.stringify({event:'moneyhunter_hourly_report',report:r})).catch(e=>console.error(JSON.stringify({event:'hourly_report_error',error:String(e)}))),60*60*1000);return{enabled:true};}
-export function hourlyReportStatus(){return{last_report:lastReport,enabled:Boolean(timer)};}
+
+export function startHourlyReport(getStats=()=>({})){
+  if(timer) return {enabled:true};
+  timer=setInterval(
+    ()=>buildHourlyReport(getStats())
+      .then(r=>console.log(JSON.stringify({event:'moneyhunter_hourly_report',report:r})))
+      .catch(e=>console.error(JSON.stringify({event:'hourly_report_error',error:String(e)}))),
+    60*60*1000
+  );
+  return {enabled:true};
+}
+
+export function hourlyReportStatus(){return{last_report:lastReport,enabled:Boolean(timer)}}
