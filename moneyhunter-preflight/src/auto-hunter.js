@@ -11,7 +11,7 @@ let running=false,timer=null,lastRun=null,lastError=null;
 const DEFAULT_SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty','bountybook','gitlawbounty'];
 async function huntOnce(){if(running)return{status:'busy',last_run:lastRun,last_error:lastError};running=true;lastError=null;const started=Date.now();try{
 const configuredSources=String(process.env.AUTO_HUNT_SOURCES||DEFAULT_SOURCES.join(',')).split(',').map(x=>x.trim()).filter(Boolean),sources=filterAvailableSources(configuredSources);
-const radar=await runRadar({sources,minReward:Number(process.env.AUTO_HUNT_MIN_REWARD||5),limit:Number(process.env.AUTO_HUNT_LIMIT||25),useCache:false});
+const radar=await runRadar({sources,minReward:Number(process.env.AUTO_HUNT_MIN_REWARD ?? 0),limit:Number(process.env.AUTO_HUNT_LIMIT ?? 25),useCache:false});
 for(const [source,status] of Object.entries(radar.source_status||{}))observeSourceStatus(source,status);
 const zeroCapital=buildZeroCapitalPlan(radar.opportunities||[]),strategy=await buildStrategyState(radar.strategy?.portfolio||radar.opportunities||[]);
 const candidates=(strategy.ranked_opportunities||[]).map(item=>({...item,web_automation_available:false,tinyfish_url:null}));
