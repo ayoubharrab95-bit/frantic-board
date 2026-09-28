@@ -29,7 +29,7 @@ import { buildAutonomyPolicy, autonomyDecision, buildSelfHealingPlan } from './a
 import { buildDevelopmentPlan, runDevelopmentCycle, developmentStatus } from './development-engine.js';
 import { sourceHealth } from './source-health.js';
 import { buildZeroCapitalPlan, buildCommerceOffers } from './zero-capital-engine.js';
-import { revenueLanes, buildRevenueLanes } from './revenue-lanes.js';
+import { buildRevenueLanes } from './revenue-lanes.js';
 import { listServices, executeService } from './services.js';
 import { treasuryStatus, treasuryPolicy } from './treasury.js';
 import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
