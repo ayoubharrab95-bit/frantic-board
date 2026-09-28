@@ -30,7 +30,7 @@ export async function ensureBasedAgentsIdentity(){
   return{status:'registered',id};
  }catch(error){
   const message=String(error);
-  if(/BasedAgents HTTP 409:\s*conflict/i.test(message)){console.log(JSON.stringify({event:'basedagents_identity_ready',status:'already_registered',id});return{status:'registered',id,already_registered:true};}
+  if(/BasedAgents HTTP 409:\s*conflict/i.test(message)){console.log(JSON.stringify({event:'basedagents_identity_ready',status:'already_registered',id}));return{status:'registered',id,already_registered:true};}
   console.error(JSON.stringify({event:'basedagents_identity_bootstrap_error',error:message}));return{status:'error',error:message};
  }
 }
