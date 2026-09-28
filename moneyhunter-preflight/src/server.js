@@ -15,6 +15,7 @@ import { registerMyaExecutor } from './executors-mya.js';
 import { registerBasedAgentsExecutor } from './executors-basedagents.js';
 import { registerGitHubClaimExecutors } from './executors-github-claims.js';
 import { registerGitHubExecutor } from './executors-github.js';
+import { registerBountyBookExecutor, bountyBookAgentAddress } from './executors-bountybook.js';
 import { startAutoHunter, huntOnce } from './auto-hunter.js';
 import { hourlyReportStatus, buildHourlyReport } from './hourly-report.js';
 import { incomeEngines, buildIncomePlan, buildIncomeSnapshot } from './income-orchestrator.js';
@@ -35,7 +36,7 @@ import { treasuryStatus, treasuryPolicy } from './treasury.js';
 import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
 import { ensureBasedAgentsIdentity } from './basedagents-bootstrap.js';
 ensureBasedAgentsIdentity().catch(error=>console.error(JSON.stringify({event:'basedagents_identity_bootstrap_unhandled',error:String(error)})));
-registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors(); registerGitHubExecutor();
+registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors(); registerGitHubExecutor(); registerBountyBookExecutor();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
 const port=Number(process.env.PORT||8787);
@@ -63,6 +64,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/v1/hourly-report')return json(res,200,hourlyReportStatus().last_report||await buildHourlyReport(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/payouts')return json(res,200,await payoutOverview(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/money-mode')return json(res,200,{enabled:String(process.env.MONEY_MODE??'true').toLowerCase()!=='false',wallet_configured:/^0x[a-f-f0-9]{40}$/i.test(process.env.TREASURY_BASE_ADDRESS||''),network:'base',asset:'USDC',private_key_required:false},{'cache-control':'no-store'});
+ if(req.method==='GET'&&req.url==='/v1/bountybook-wallet')return json(res,200,{configured:Boolean(bountyBookAgentAddress()),network:'base',address:bountyBookAgentAddress()},{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/payouts/registry')return json(res,200,{routes:payoutRegistry()},{'cache-control':'no-store'});
  if(req.method==='POST'&&req.url==='/v1/payouts/route'){try{const p=await readJson(req);return json(res,200,payoutRoute(p.source,p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/treasury')return json(res,200,await treasuryStatus(),{'cache-control':'no-store'});
