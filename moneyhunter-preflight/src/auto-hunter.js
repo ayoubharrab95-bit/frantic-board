@@ -5,6 +5,7 @@ import { enqueueOpportunity, updateExecution } from './revenue-memory.js';
 import { buildStrategyState } from './strategy-engine.js';
 import { runDevelopmentCycle } from './development-engine.js';
 import { observeSourceStatus, filterAvailableSources, sourceHealth } from './source-health.js';
+import { buildZeroCapitalPlan } from './zero-capital-engine.js';
 
 let running=false;
 let timer=null;
