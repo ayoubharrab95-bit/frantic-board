@@ -34,7 +34,7 @@ import { listServices, executeService } from './services.js';
 import { treasuryStatus, treasuryPolicy } from './treasury.js';
 import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
 import { ensureBasedAgentsIdentity } from './basedagents-bootstrap.js';
-await ensureBasedAgentsIdentity();
+ensureBasedAgentsIdentity().catch(error=>console.error(JSON.stringify({event:'basedagents_identity_bootstrap_unhandled',error:String(error)})));
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors(); registerGitHubExecutor();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
