@@ -6,59 +6,18 @@ import { buildStrategyState } from './strategy-engine.js';
 import { runDevelopmentCycle } from './development-engine.js';
 import { observeSourceStatus, filterAvailableSources, sourceHealth } from './source-health.js';
 import { buildZeroCapitalPlan } from './zero-capital-engine.js';
-
 let running=false,timer=null,lastRun=null,lastError=null;
 const DEFAULT_SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty','gitlawbounty'];
-
-async function huntOnce(){
- if(running)return {status:'busy',last_run:lastRun,last_error:lastError};
- running=true;lastError=null;const started=Date.now();
- try{
-  const configuredSources=String(process.env.AUTO_HUNT_SOURCES||DEFAULT_SOURCES.join(',')).split(',').map(x=>x.trim()).filter(Boolean);
-  const sources=filterAvailableSources(configuredSources);
-  const radar=await runRadar({sources,minReward:Number(process.env.AUTO_HUNT_MIN_REWARD||5),limit:Number(process.env.AUTO_HUNT_LIMIT||25),useCache:false});
-  for(const [source,status] of Object.entries(radar.source_status||{}))observeSourceStatus(source,status);
-  const zeroCapital=buildZeroCapitalPlan(radar.opportunities||[]);
-  const strategy=await buildStrategyState(radar.strategy?.portfolio||radar.opportunities||[]);
-  const candidates=(strategy.ranked_opportunities||[]).map(item=>({...item,web_automation_available:false,tinyfish_url:null}));
-  const plan=buildExecutionPlan(candidates),executors=listExecutors(),queued=[],gated=[],ready=[],attempted=[];
-  let development=null;
-  for(const plannedItem of plan){
-   if(plannedItem.policy?.action==='reject')continue;
-   const row=await enqueueOpportunity(plannedItem);queued.push(row);
-   if(plannedItem.policy?.action==='api_execute'){
-    const payoutOk=Number(plannedItem.payment_confidence??0)>=Number(process.env.AUTO_EXECUTE_MIN_PAYMENT_CONFIDENCE||.80);
-    const noManualPayout=!plannedItem.requires_manual_payment;
-    const ex=executors.find(x=>x.source===plannedItem.source);
-    if(ex?.credentialed&&payoutOk&&noManualPayout){
-     ready.push({opportunity:plannedItem,row});
-     if(process.env.AUTO_EXECUTE_CLAIMS!=='false'){
-      try{
-       const actionBySource={frantic:'claim',taskbounty:'claim_access',clawlancer:'claim',mya:'apply',basedagents:'claim',algora:'claim',opire:'claim'};
-       const action=actionBySource[plannedItem.source]||'claim';
-       const result=await executeOpportunity(plannedItem,{dryRun:false,action,pr_url:plannedItem.raw?.pr_url,issue_number:plannedItem.raw?.issue_number});
-       attempted.push({id:plannedItem.id,source:plannedItem.source,result});
-       await updateExecution(row.id,{status:result.status||'attempted',last_result:result});
-      }catch(error){
-       attempted.push({id:plannedItem.id,source:plannedItem.source,error:String(error)});
-       await updateExecution(row.id,{status:'error',last_error:String(error)});
-      }
-     }
-    }else gated.push({source:plannedItem.source,id:plannedItem.id,reason:!ex?.credentialed?'executor_not_credentialed':!payoutOk?'payment_confidence_below_auto_threshold':'manual_payment'});
-   }
-  }
-  if(ready.length===0||candidates.length===0||gated.length>=Math.max(1,plan.length))development=await runDevelopmentCycle({sourceStatus:radar.source_status,executors});
-  lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,zero_capital_found:zeroCapital.count,zero_capital_top:zeroCapital.opportunities.slice(0,5),queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,gated_reasons:gated,source_status:radar.source_status,source_health:sourceHealth(),development:development?.result||null};
-  console.log(JSON.stringify({event:'auto_hunter_cycle',...lastRun}));
-  return {status:'ok',summary:lastRun,radar,zero_capital:zeroCapital,strategy,executors,development};
- }catch(error){lastError=String(error);console.error(JSON.stringify({event:'auto_hunter_error',error:lastError}));return {status:'error',error:lastError,last_run:lastRun}}
- finally{running=false;}
-}
-
-export function startAutoHunter(){
- if(process.env.AUTO_HUNT!=='true')return {enabled:false,status:()=>({enabled:false,last_run:lastRun,last_error:lastError})};
- const interval=Math.max(300000,Number(process.env.AUTO_HUNT_INTERVAL_MS||300000));
- if(!timer){timer=setInterval(()=>huntOnce().catch(error=>console.error(JSON.stringify({event:'auto_hunter_unhandled',error:String(error)})),interval));huntOnce().catch(error=>console.error(JSON.stringify({event:'auto_hunter_initial_error',error:String(error)})))}
- return {enabled:true,interval_ms:interval,status:()=>({enabled:true,running,lastRun,last_error:lastError,interval_ms:interval})};
-}
-export {huntOnce};
+async function huntOnce(){if(running)return{status:'busy',last_run:lastRun,last_error:lastError};running=true;lastError=null;const started=Date.now();try{
+const configuredSources=String(process.env.AUTO_HUNT_SOURCES||DEFAULT_SOURCES.join(',')).split(',').map(x=>x.trim()).filter(Boolean),sources=filterAvailableSources(configuredSources);
+const radar=await runRadar({sources,minReward:Number(process.env.AUTO_HUNT_MIN_REWARD||5),limit:Number(process.env.AUTO_HUNT_LIMIT||25),useCache:false});
+for(const [source,status] of Object.entries(radar.source_status||{}))observeSourceStatus(source,status);
+const zeroCapital=buildZeroCapitalPlan(radar.opportunities||[]),strategy=await buildStrategyState(radar.strategy?.portfolio||radar.opportunities||[]);
+const candidates=(strategy.ranked_opportunities||[]).map(item=>({...item,web_automation_available:false,tinyfish_url:null}));
+const plan=buildExecutionPlan(candidates),executors=listExecutors(),queued=[],gated=[],ready=[],attempted=[];let development=null;
+for(const plannedItem of plan){if(plannedItem.policy?.action==='reject')continue;const row=await enqueueOpportunity(plannedItem);queued.push(row);if(plannedItem.policy?.action==='api_execute'){const payoutOk=Number(plannedItem.payment_confidence??0)>=Number(process.env.AUTO_EXECUTE_MIN_PAYMENT_CONFIDENCE||.80),noManualPayout=!plannedItem.requires_manual_payment,ex=executors.find(x=>x.source===plannedItem.source);if(ex?.credentialed&&payoutOk&&noManualPayout){ready.push({opportunity:plannedItem,row});if(process.env.AUTO_EXECUTE_CLAIMS!=='false'){try{const actionBySource={frantic:'claim',taskbounty:'claim_access',clawlancer:'claim',mya:'apply',basedagents:'claim',algora:'claim',opire:'claim'},action=actionBySource[plannedItem.source]||'claim',result=await executeOpportunity(plannedItem,{dryRun:false,action,pr_url:plannedItem.raw?.pr_url,issue_number:plannedItem.raw?.issue_number});attempted.push({id:plannedItem.id,source:plannedItem.source,result});await updateExecution(row.id,{status:result.status||'attempted',last_result:result});}catch(error){attempted.push({id:plannedItem.id,source:plannedItem.source,error:String(error)});await updateExecution(row.id,{status:'error',last_error:String(error)});}}}else gated.push({source:plannedItem.source,id:plannedItem.id,reason:!ex?.credentialed?'executor_not_credentialed':!payoutOk?'payment_confidence_below_auto_threshold':'manual_payment'});}}
+if(ready.length===0||candidates.length===0||gated.length>=Math.max(1,plan.length))development=await runDevelopmentCycle({sourceStatus:radar.source_status,executors});
+lastRun={at:new Date().toISOString(),duration_ms:Date.now()-started,found:radar.count,zero_capital_found:zeroCapital.count,zero_capital_top:zeroCapital.opportunities.slice(0,5),queued:queued.length,ready:ready.length,attempted:attempted.length,gated:gated.length,gated_reasons:gated,source_status:radar.source_status,source_health:sourceHealth(),development:development?.result||null};console.log(JSON.stringify({event:'auto_hunter_cycle',...lastRun}));return{status:'ok',summary:lastRun,radar,zero_capital:zeroCapital,strategy,executors,development};
+}catch(error){lastError=String(error);console.error(JSON.stringify({event:'auto_hunter_error',error:lastError}));return{status:'error',error:lastError,last_run:lastRun}}finally{running=false;}}
+export function startAutoHunter(){if(process.env.AUTO_HUNT!=='true')return{enabled:false,status:()=>({enabled:false,last_run:lastRun,last_error:lastError})};const interval=Math.max(300000,Number(process.env.AUTO_HUNT_INTERVAL_MS||300000));if(!timer){timer=setInterval(()=>huntOnce().catch(error=>console.error(JSON.stringify({event:'auto_hunter_unhandled',error:String(error)}))),interval);huntOnce().catch(error=>console.error(JSON.stringify({event:'auto_hunter_initial_error',error:String(error)})))}return{enabled:true,interval_ms:interval,status:()=>({enabled:true,running,last_run:lastRun,last_error:lastError})};}
+export{huntOnce};
