@@ -11,6 +11,7 @@ import { discoverGitLawBounty } from './sources/gitlawbounty.js';
 import { opportunityKey } from './opportunity.js';
 import { buildStrategyPlan, improvementProposals, enrichEconomics, setSourcePriors } from './strategy.js';
 import { getSourcePriors, enqueueOpportunity } from './revenue-memory.js';
+import { applyPayoutCompatibility, moneyModeEnabled } from './payout-policy.js';
 
 const SOURCES=['taskbounty','basedagents','basebounty','frantic','github','algora','opire','clawlancer','mya','gitlawbounty'];
 const CACHE_TTL_MS=Number(process.env.RADAR_CACHE_TTL_MS||60000),cache=new Map();
@@ -39,7 +40,8 @@ export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=tr
  if(params.sources.includes('gitlawbounty'))jobs.push(safe('gitlawbounty',()=>discoverGitLawBounty({limit:params.limit,minReward:params.minReward})));
  const batches=await Promise.all(jobs),found=batches.flatMap(b=>b.items),seen=new Set(),deduped=[];
  for(const item of found){const k=opportunityKey(item);if(seen.has(k))continue;seen.add(k);deduped.push(item);}
- const opportunities=deduped.filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward)
+ const opportunities=applyPayoutCompatibility(deduped).filter(i=>i.status==='open'&&i.ai_policy!=='prohibited'&&(i.reward??0)>=params.minReward)
+  .filter(i=>!moneyModeEnabled() || i.payout_compatible===true)
   .filter(i=>Number(i.payment_confidence ?? 0) >= Number(process.env.MIN_PAYMENT_CONFIDENCE||0.20))
   .map(i=>{
   const payment=normalizedPayment(i),competition=normalizedCompetition(i),ev=expectedValue(i);
@@ -49,6 +51,6 @@ export async function runRadar({sources=SOURCES,minReward=5,limit=25,useCache=tr
   weakSources=Object.entries(sourceStatus).filter(([,s])=>!s.ok||s.found===0).map(([name,s])=>({source:name,action:s.ok?'expand_discovery':'repair_or_deprioritize',reason:s.error||'source returned no qualifying opportunities'})),strategy=buildStrategyPlan({opportunities,sourceStatus});
  if(process.env.AUTO_QUEUE_OPPORTUNITIES==='true'){for(const item of strategy.portfolio){try{await enqueueOpportunity(item)}catch{}}}
  strategy.source_actions=[...(strategy.source_actions||[]),...weakSources];
- const value={generated_at:new Date().toISOString(),strategy_revision:strategy.strategy_revision,requested_sources:params.sources,source_status:sourceStatus,count:opportunities.length,opportunities,strategy,improvement_proposals:improvementProposals({sourceStatus,opportunities}),cached:false};
+ const value={generated_at:new Date().toISOString(),strategy_revision:strategy.strategy_revision,money_mode:moneyModeEnabled(),requested_sources:params.sources,source_status:sourceStatus,count:opportunities.length,opportunities,strategy,improvement_proposals:improvementProposals({sourceStatus,opportunities}),cached:false};
  cache.set(key,{at:Date.now(),value});return value;
 }
