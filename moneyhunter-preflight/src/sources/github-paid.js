@@ -42,7 +42,7 @@ function canonicalSolverReward(text = '') {
 
 function isLikelyPaid(issue) {
   const text = `${issue.title || ''}\n${issue.body || ''}`;
-  return /\b(bounty|reward|paid issue|USDC|USD|\$\s*\d+)\b/i.test(text);
+  return /\b(bounty|reward|paid issue|solver reward|USDC|USDT|crypto payout|crypto payment|USD|\$\s*\d+)\b/i.test(text);
 }
 
 export function classifyPaymentState({ text = '', paymentScore = 0, requiresSpending = false } = {}) {
@@ -63,11 +63,22 @@ export function classifyPaymentState({ text = '', paymentScore = 0, requiresSpen
 
 export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {}) {
   resetPaymentVerificationBudget();
+  // Deliberately broad discovery first; MONEY MODE and payment verification
+  // perform the safety filtering later. This catches crypto-funded bounties
+  // that do not use the word "bounty" in their title.
   const queries = [
-    'is:issue is:open bounty "$"',
+    'is:issue is:open bounty',
     'is:issue is:open reward USDC',
+    'is:issue is:open reward USDT',
+    'is:issue is:open "solver reward"',
     'is:issue is:open "paid issue"',
-    'is:issue is:open label:bounty'
+    'is:issue is:open "payment on merge"',
+    'is:issue is:open "paid on merge"',
+    'is:issue is:open "payout on merge"',
+    'is:issue is:open "crypto payout"',
+    'is:issue is:open "crypto payment"',
+    'is:issue is:open label:bounty',
+    'is:issue is:open label:reward'
   ];
 
   const merged = new Map();
@@ -77,15 +88,15 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
       for (const issue of await searchIssues(q, fetchImpl)) {
         if (!issue?.html_url || !isLikelyPaid(issue)) continue;
         merged.set(issue.html_url, issue);
-        if (merged.size >= limit * 3) break;
+        if (merged.size >= limit * 4) break;
       }
     } catch {
-      // A single query can rate-limit or fail without killing the whole radar.
+      // One query can fail/rate-limit without killing the complete radar.
     }
   }));
 
   const results = [];
-  for (const issue of [...merged.values()].slice(0, limit * 2)) {
+  for (const issue of [...merged.values()].slice(0, limit * 3)) {
     const fullText = `${issue.title || ''}\n${issue.body || ''}`;
     const parsedReward = extractReward(issue.title || '', issue.body || '');
     const canonicalReward = canonicalSolverReward(fullText);
@@ -121,8 +132,10 @@ export async function discoverGitHubPaid({ limit = 25, fetchImpl = fetch } = {})
       competition_score: Math.max(0.05, 1 / (1 + (issue.comments || 0) / 4)),
       requires_manual_payment: requiresManualPayment,
       requires_spending: requiresSpending,
+      claim_api_available: false,
       raw: {
         repository: repo,
+        issue_number: issue.number,
         created_at: issue.created_at,
         updated_at: issue.updated_at,
         payment_signals: payment,
