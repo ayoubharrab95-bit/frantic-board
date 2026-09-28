@@ -29,6 +29,7 @@ import { buildAutonomyPolicy, autonomyDecision, buildSelfHealingPlan } from './a
 import { buildDevelopmentPlan, runDevelopmentCycle, developmentStatus } from './development-engine.js';
 import { sourceHealth } from './source-health.js';
 import { buildZeroCapitalPlan, buildCommerceOffers } from './zero-capital-engine.js';
+import { revenueLanes, buildRevenueLanes } from './revenue-lanes.js';
 import { treasuryStatus, treasuryPolicy } from './treasury.js';
 import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
 import { ensureBasedAgentsIdentity } from './basedagents-bootstrap.js';
@@ -50,6 +51,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/llms.txt')return text(res,200,LLMS_TEXT);
  if(req.method==='GET'&&req.url==='/openapi.json')return json(res,200,OPENAPI);
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
+ if(req.method==='GET'&&req.url==='/v1/revenue-lanes')return json(res,200,{generated_at:new Date().toISOString(),lanes:buildRevenueLanes({availableSources:[],credentialedExecutors:listExecutors().filter(x=>x.credentialed).map(x=>x.source)})},{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/channels')return json(res,200,{generated_at:new Date().toISOString(),channels:revenueChannels(),portfolio:buildRevenuePortfolio()},{'cache-control':'public, max-age=120'});
  if(req.method==='GET'&&req.url==='/v1/income-engines')return json(res,200,{generated_at:new Date().toISOString(),engines:incomeEngines(),plan:buildIncomePlan()},{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/autonomy-policy')return json(res,200,buildAutonomyPolicy(),{'cache-control':'no-store'});
