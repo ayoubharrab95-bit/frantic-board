@@ -31,6 +31,8 @@ import { sourceHealth } from './source-health.js';
 import { buildZeroCapitalPlan, buildCommerceOffers } from './zero-capital-engine.js';
 import { treasuryStatus, treasuryPolicy } from './treasury.js';
 import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
+import { ensureBasedAgentsIdentity } from './basedagents-bootstrap.js';
+await ensureBasedAgentsIdentity();
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors(); registerGitHubExecutor(); registerTinyFishExecutor();
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
