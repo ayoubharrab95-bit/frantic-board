@@ -12,7 +12,7 @@ import { opportunityKey } from './opportunity.js';
 import { buildStrategyPlan, improvementProposals, enrichEconomics, setSourcePriors } from './strategy.js';
 import { getSourcePriors, enqueueOpportunity } from './revenue-memory.js';
 
-const SOURCES=['frantic','github','algora','opire','clawlancer','mya','basedagents','taskbounty','basebounty','gitlawbounty'];
+const SOURCES=['taskbounty','basedagents','basebounty','frantic','github','algora','opire','clawlancer','mya','gitlawbounty'];
 const CACHE_TTL_MS=Number(process.env.RADAR_CACHE_TTL_MS||60000),cache=new Map();
 const clamp=(x)=>Math.max(0,Math.min(1,Number(x)||0));
 function normalizedCompetition(i){if(i.competition_score!=null)return clamp(i.competition_score);return 1/(1+(i.active_claims??0));}
