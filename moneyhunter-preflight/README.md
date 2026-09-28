@@ -12,7 +12,7 @@ The goal is simple:
 
 MoneyHunter does **not** promise payment, acceptance, or daily income. It reduces wasted compute and bad claims.
 
-## v0.4 capabilities
+## v0.6 capabilities
 
 ### 1. GitHub bounty preflight
 
@@ -193,3 +193,19 @@ Priority order:
 5. improve the owned asset whenever no better external work is available
 
 This keeps the system productive even when bounty boards are quiet.
+
+
+### MONEY MODE (v0.6)
+
+The default hunting mode is now crypto-first and payout-gated. An opportunity is eligible for automatic execution only when its payout is explicitly verified as receivable by the configured public EVM treasury address (MetaMask-compatible), has sufficient payment confidence, and does not require spending or a wallet signature. MetaMask supports Base and other EVM networks; MoneyHunter currently uses Base USDC as its first-class payout rail and records confirmed income separately from pending/expected value. citeturn1search0turn1search9
+
+Set only the public receiving address:
+
+- `TREASURY_BASE_ADDRESS=0x...`
+- Never provide a seed phrase or private key for receiving payouts.
+
+### Autonomous cadence
+
+When `AUTO_HUNT=true`, the hunter runs every **15 minutes** (minimum interval 15m) and the service emits an hourly income/attempt report. The web service exposes `/v1/money-mode`, `/v1/hourly-report`, and `/v1/system-state` for monitoring.
+
+TinyFish is not part of the active executor registration. API/HTTP/GitHub paths remain the preferred execution routes.
