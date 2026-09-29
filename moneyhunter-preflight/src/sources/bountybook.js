@@ -16,10 +16,10 @@ function parseJob(job,index){
     status:job.status==='open'?'open':'unknown',ai_policy:'allowed',
     payment_confidence:funded?0.96:0.78,
     competition_score:Math.max(0.05,1/(1+Number(job.claims||job.active_claims||0))),
-    requires_manual_payment:false,requires_wallet_signature:true,requires_spending:false,
+    requires_manual_payment:false,requires_wallet_signature:true,wallet_signature_mode:'agent_key',requires_spending:false,
     claim_api_available:true,submit_api_available:true,
     estimated_minutes:Number(job.estimated_minutes||job.estimatedMinutes||null)||null,
-    raw:{job_id:job.id,spec,instructions,escrow_status:escrow,chain:job.chain||'Base (8453)',fee:'4% on successful verification'}
+    raw:{job_id:job.id,spec,instructions,escrow_status:escrow,chain:job.chain||'Base (8453)',payout_network:'base',payout_asset:'USDC',payout_wallet_required:true,fee:'4% on successful verification'}
   });
 }
 export async function discoverBountyBook({limit=25,fetchImpl=fetch}={}){
