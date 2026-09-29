@@ -1,6 +1,7 @@
 const TREASURY_BASE_ADDRESS = process.env.TREASURY_BASE_ADDRESS || '';
 
 const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+const BASE_CHAIN_ID = '0x2105';
 const BASE_USDC = (process.env.BASE_USDC_CONTRACT || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913').toLowerCase();
 
 function validAddress(address) {
@@ -90,6 +91,8 @@ export async function verifyUsdcPayment({tx_hash,expected_amount_usdc=0}={}){
   if(!/^0x[a-fA-F0-9]{64}$/.test(tx))return{verified:false,reason:'invalid_tx_hash'};
   if(!validAddress(treasury))return{verified:false,reason:'treasury_not_configured'};
   try{
+    const chainId=await rpc('eth_chainId',[]);
+    if(String(chainId).toLowerCase()!==BASE_CHAIN_ID)return{verified:false,reason:'wrong_network',tx_hash:tx,network:'base',chain_id:chainId};
     const receipt=await rpc('eth_getTransactionReceipt',[tx]);
     if(!receipt)return{verified:false,reason:'transaction_not_found',tx_hash:tx};
     if(String(receipt.status||'').toLowerCase()!=='0x1')return{verified:false,reason:'transaction_failed',tx_hash:tx};
