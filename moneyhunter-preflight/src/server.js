@@ -39,6 +39,7 @@ import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js'
 import { ensureBasedAgentsIdentity } from './basedagents-bootstrap.js';
 ensureBasedAgentsIdentity().catch(error=>console.error(JSON.stringify({event:'basedagents_identity_bootstrap_unhandled',error:String(error)})));
 registerTaskBountyExecutor(); registerClawlancerExecutor(); registerFranticExecutor(); registerMyaExecutor(); registerBasedAgentsExecutor(); registerGitHubClaimExecutors(); registerGitHubExecutor(); registerBountyBookExecutor();
+console.log(JSON.stringify({event:'executor_bootstrap',executors:listExecutors().map(x=>({source:x.source,available:x.available,credentialed:x.credentialed,actions:x.actions}))}));
 const autoHunter=startAutoHunter();
 import { observeRequest,observePreflight,observeRadar,observePaymentCheck,snapshotMetrics } from './observability.js';
 const port=Number(process.env.PORT||8787);
