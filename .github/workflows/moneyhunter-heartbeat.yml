@@ -1,0 +1,15 @@
+name: MoneyHunter heartbeat
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+jobs:
+  wake-hunter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Wake MoneyHunter
+        run: |
+          curl --fail --silent --show-error --max-time 30             https://moneyhunter-preflight.onrender.com/health
