@@ -33,7 +33,7 @@ import { buildZeroCapitalPlan, buildCommerceOffers } from './zero-capital-engine
 import { buildRevenueLanes } from './revenue-lanes.js';
 import { listServices, executeService } from './services.js';
 import { listCapabilities, buildWorkPlan } from './work-engine.js';
-import { treasuryStatus, treasuryPolicy } from './treasury.js';
+import { treasuryStatus, treasuryPolicy, verifyUsdcPayment } from './treasury.js';
 import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
 import { ensureBasedAgentsIdentity } from './basedagents-bootstrap.js';
 ensureBasedAgentsIdentity().catch(error=>console.error(JSON.stringify({event:'basedagents_identity_bootstrap_unhandled',error:String(error)})));
@@ -72,6 +72,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='POST'&&req.url==='/v1/payouts/route'){try{const p=await readJson(req);return json(res,200,payoutRoute(p.source,p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/treasury')return json(res,200,await treasuryStatus(),{'cache-control':'no-store'});
  if(req.method==='GET'&&req.url==='/v1/treasury/policy')return json(res,200,treasuryPolicy(),{'cache-control':'no-store'});
+ if(req.method==='POST'&&req.url==='/v1/treasury/verify-payment'){try{const p=await readJson(req);return json(res,200,await verifyUsdcPayment(p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='GET'&&req.url==='/v1/zero-capital-plan'){try{const radar=await runRadar({...parseRadarQuery('/'),minReward:0});return json(res,200,buildZeroCapitalPlan(radar.opportunities||[]),{'cache-control':'no-store'})}catch(e){return json(res,502,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url==='/v1/commerce-offers'){try{const p=await readJson(req);return json(res,200,buildCommerceOffers(p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url==='/v1/development-plan'){try{const p=await readJson(req);return json(res,200,await buildDevelopmentPlan(p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
