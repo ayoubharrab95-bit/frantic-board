@@ -1,0 +1,26 @@
+name: MoneyHunter verify
+
+on:
+  push:
+    paths:
+      - 'moneyhunter-preflight/**'
+  pull_request:
+    paths:
+      - 'moneyhunter-preflight/**'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: moneyhunter-preflight
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: moneyhunter-preflight/package-lock.json
+      - run: npm ci
+      - run: npm run verify
