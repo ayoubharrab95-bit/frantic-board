@@ -69,6 +69,48 @@ export async function treasuryStatus() {
   }
 }
 
+
+const TRANSFER_TOPIC='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a3b2b3c5d1';
+function topicAddress(topic){return '0x'+String(topic||'').slice(-40).toLowerCase();}
+function decodeTransferLog(log, treasury){
+  if(String(log?.topics?.[0]||'').toLowerCase()!==TRANSFER_TOPIC)return null;
+  if(!Array.isArray(log.topics)||log.topics.length<3)return null;
+  return {
+    token:String(log.address||'').toLowerCase(),
+    from:topicAddress(log.topics[1]),
+    to:topicAddress(log.topics[2]),
+    amount_base_units:hexToBigInt(log.data||'0x0').toString(),
+    amount_usdc:formatUnits(hexToBigInt(log.data||'0x0'),6),
+    treasury_match:topicAddress(log.topics[2])===treasury.toLowerCase()
+  };
+}
+export async function verifyUsdcPayment({tx_hash,expected_amount_usdc=0}={}){
+  const tx=String(tx_hash||'').trim();
+  const treasury=TREASURY_BASE_ADDRESS.trim();
+  if(!/^0x[a-fA-F0-9]{64}$/.test(tx))return{verified:false,reason:'invalid_tx_hash'};
+  if(!validAddress(treasury))return{verified:false,reason:'treasury_not_configured'};
+  try{
+    const receipt=await rpc('eth_getTransactionReceipt',[tx]);
+    if(!receipt)return{verified:false,reason:'transaction_not_found',tx_hash:tx};
+    if(String(receipt.status||'').toLowerCase()!=='0x1')return{verified:false,reason:'transaction_failed',tx_hash:tx};
+    const transfers=(receipt.logs||[]).map(log=>decodeTransferLog(log,treasury)).filter(Boolean).filter(x=>x.token===BASE_USDC);
+    const matching=transfers.filter(x=>x.treasury_match);
+    const expected=Number(expected_amount_usdc)||0;
+    const received=matching.reduce((sum,x)=>sum+Number(x.amount_usdc),0);
+    return {
+      verified:matching.length>0 && received >= expected,
+      reason:matching.length===0?'no_usdc_transfer_to_treasury':received<expected?'received_amount_below_expected':'verified',
+      tx_hash:tx,
+      treasury,
+      expected_amount_usdc:expected,
+      received_amount_usdc:Number(received.toFixed(6)),
+      transfers:matching,
+      block_number:receipt.blockNumber||null,
+      checked_at:new Date().toISOString()
+    };
+  }catch(error){return{verified:false,reason:'rpc_error',tx_hash:tx,error:String(error.message||error),checked_at:new Date().toISOString()};}
+}
+
 export function treasuryPolicy() {
   return {
     destination: TREASURY_BASE_ADDRESS || null,
