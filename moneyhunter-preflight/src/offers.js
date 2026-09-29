@@ -27,6 +27,42 @@ export const OFFERS = [
     description: 'Small documentation, test, bug-fix or integration contribution where the repository permits AI-assisted work.'
   },
   {
+    id: 'web-data-extraction',
+    channel: 'direct-hire',
+    type: 'service',
+    name: 'Web Data Extraction',
+    price_from_usd: 5,
+    delivery: 'structured JSON/CSV',
+    description: 'Extract and normalize publicly accessible web data into a validated machine-readable dataset.'
+  },
+  {
+    id: 'research-brief',
+    channel: 'direct-hire',
+    type: 'service',
+    name: 'Research Brief',
+    price_from_usd: 5,
+    delivery: 'source-backed report',
+    description: 'Research a defined question, collect sources, normalize findings and return a concise evidence-backed brief.'
+  },
+  {
+    id: 'qa-regression-pack',
+    channel: 'direct-hire',
+    type: 'service',
+    name: 'QA Regression Pack',
+    price_from_usd: 10,
+    delivery: 'test report + reproduction',
+    description: 'Reproduce a reported issue, add deterministic regression coverage and document verification steps.'
+  },
+  {
+    id: 'api-integration-small',
+    channel: 'direct-hire',
+    type: 'service',
+    name: 'Small API Integration',
+    price_from_usd: 20,
+    delivery: 'tested integration',
+    description: 'Implement a bounded API/webhook integration with tests and a concise runbook.'
+  },
+  {
     id: 'moneyhunter-mcp',
     channel: 'reusable-assets',
     type: 'developer_asset',
