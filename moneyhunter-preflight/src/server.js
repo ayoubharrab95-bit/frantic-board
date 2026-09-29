@@ -34,6 +34,7 @@ import { buildRevenueLanes } from './revenue-lanes.js';
 import { listServices, executeService } from './services.js';
 import { listCapabilities, buildWorkPlan } from './work-engine.js';
 import { treasuryStatus, treasuryPolicy, verifyUsdcPayment } from './treasury.js';
+import { createPaidJob, paidJobStatus, paidJobCatalog } from './paid-jobs.js';
 import { payoutOverview, payoutRegistry, payoutRoute } from './payout-router.js';
 import { ensureBasedAgentsIdentity } from './basedagents-bootstrap.js';
 ensureBasedAgentsIdentity().catch(error=>console.error(JSON.stringify({event:'basedagents_identity_bootstrap_unhandled',error:String(error)})));
@@ -55,6 +56,9 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='GET'&&req.url==='/openapi.json')return json(res,200,OPENAPI);
  if(req.method==='GET'&&req.url==='/v1/pricing')return json(res,200,PRICING,{'cache-control':'public, max-age=300'});
  if(req.method==='GET'&&req.url==='/v1/services')return json(res,200,{generated_at:new Date().toISOString(),services:listServices()},{'cache-control':'public, max-age=60'});
+ if(req.method==='GET'&&req.url==='/v1/paid-jobs/catalog')return json(res,200,{generated_at:new Date().toISOString(),services:paidJobCatalog(),payment:{asset:'USDC',network:'Base',network_id:'eip155:8453',treasury_configured:Boolean(process.env.TREASURY_BASE_ADDRESS)}},{'cache-control':'no-store'});
+ if(req.method==='POST'&&req.url==='/v1/paid-jobs'){try{const p=await readJson(req);const r=await createPaidJob(p);return json(res,r.status==='payment_rejected'?402:201,r,{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
+ if(req.method==='GET'&&req.url?.startsWith('/v1/paid-jobs/')){const id=decodeURIComponent(req.url.split('/').pop());const job=await paidJobStatus(id);return job?json(res,200,{job},{'cache-control':'no-store'}):json(res,404,{error:'job_not_found'})}
  if(req.method==='GET'&&req.url==='/v1/work-capabilities')return json(res,200,{generated_at:new Date().toISOString(),capabilities:listCapabilities()},{'cache-control':'public, max-age=300'});
  if(req.method==='POST'&&req.url==='/v1/work-plan'){try{const p=await readJson(req);return json(res,200,buildWorkPlan(p),{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
  if(req.method==='POST'&&req.url?.startsWith('/v1/services/')){try{const slug=decodeURIComponent(req.url.split('/').pop());return json(res,200,{service:slug,result:await executeService(slug,await readJson(req))},{'cache-control':'no-store'})}catch(e){return json(res,400,{error:e instanceof Error?e.message:String(e)})}}
