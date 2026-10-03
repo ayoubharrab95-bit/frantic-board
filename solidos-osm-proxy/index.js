@@ -1,4 +1,6 @@
-const http = require("http");\nconst dns = require("dns");\ndns.setDefaultResultOrder("ipv4first");
+const http = require("http");
+const dns = require("dns");
+dns.setDefaultResultOrder("ipv4first");
 
 const PORT = Number(process.env.PORT || 10000);
 const ENDPOINTS = [
