@@ -8,7 +8,7 @@ const PLANNER_MIN_INTERVAL_MS = Math.max(
   180000,
   Number(process.env.PLANNER_MIN_INTERVAL_MS || 360000)
 );
-const PLANNER_MAX_WORKER_IDLE_MS = Math.max(
+const PRESSURE_LATENCY_MS = Math.max(
   1000,
   Number(process.env.PLANNER_MAX_WORKER_IDLE_MS || 5000)
 );
@@ -24,6 +24,7 @@ let state = {
   last_run_at: null,
   last_completed_at: null,
   last_ok: null,
+  last_lane: null,
   last_worker_status: null,
   last_worker_ms: null,
   last_worker_processed: null,
@@ -33,6 +34,7 @@ let state = {
   last_planner_queued: null,
   last_planner_attempt_at: null,
   planner_skips: 0,
+  pressure_skips: 0,
   last_error: null,
   runs: 0,
 };
@@ -73,6 +75,35 @@ async function invoke(slug, body, timeoutMs) {
   }
 }
 
+async function workerLane(lane, timeoutMs, trigger) {
+  const worker = await invoke("booked-solid-worker", {
+    source: "render-heartbeat-v3",
+    batch_size: 1,
+    lane,
+    maintenance: false,
+  }, timeoutMs);
+
+  state.last_lane = lane;
+  state.last_worker_status = worker.status;
+  state.last_worker_ms = worker.ms;
+  state.last_worker_processed = worker.data?.processed ?? null;
+  state.last_worker_idle = worker.data?.idle ?? null;
+
+  console.log(JSON.stringify({
+    event: "worker_probe",
+    trigger,
+    lane,
+    status: worker.status,
+    ms: worker.ms,
+    processed: state.last_worker_processed,
+    idle: state.last_worker_idle,
+    deferred: worker.data?.deferred ?? null,
+    reason: worker.data?.reason ?? null,
+  }));
+
+  return worker;
+}
+
 async function heartbeat(trigger = "timer") {
   if (inFlight) {
     console.log(JSON.stringify({
@@ -89,109 +120,105 @@ async function heartbeat(trigger = "timer") {
   state.last_error = null;
 
   try {
-    const worker = await invoke("booked-solid-worker", {
-      source: "render-heartbeat-v2",
-      batch_size: 1,
-      lane: "auto",
-      maintenance: false,
-    }, 90000);
+    // Hot-path lanes only. Resolve is intentionally not polled directly here:
+    // discovery/research bursts self-chain into Resolve, so one pathological
+    // resolver cannot monopolize every external heartbeat.
+    const lanes = [
+      ["qualify", 45000],
+      ["research", 75000],
+      ["discovery", 75000],
+    ];
 
-    state.last_worker_status = worker.status;
-    state.last_worker_ms = worker.ms;
-    state.last_worker_processed = worker.data?.processed ?? null;
-    state.last_worker_idle = worker.data?.idle ?? null;
+    for (const [lane, timeoutMs] of lanes) {
+      const worker = await workerLane(lane, timeoutMs, trigger);
 
-    console.log(JSON.stringify({
-      event: "worker_probe",
-      trigger,
-      status: worker.status,
-      ms: worker.ms,
-      processed: state.last_worker_processed,
-      idle: state.last_worker_idle,
-      deferred: worker.data?.deferred ?? null,
-      reason: worker.data?.reason ?? null,
-    }));
+      // Another worker already owns the lease; production is moving.
+      if (worker.status === 202) {
+        state.last_ok = true;
+        return;
+      }
 
-    // Another worker owns the global lease: production is already moving.
-    if (worker.status === 202) {
+      if (!worker.ok) {
+        throw new Error(
+          `worker_${lane}_http_${worker.status}:${JSON.stringify(worker.data).slice(0, 700)}`
+        );
+      }
+
+      const processed = Number(worker.data?.processed ?? 0);
+      const idle = worker.data?.idle === true || processed === 0;
+
+      if (processed > 0 && !idle) {
+        // Worker v183+ self-chains the remaining due work.
+        state.last_ok = true;
+        return;
+      }
+
+      // An idle probe should be cheap. If it is not, Postgres is under pressure;
+      // do not stack more lane probes or Planner work on top of it.
+      if (worker.ms > PRESSURE_LATENCY_MS) {
+        state.pressure_skips += 1;
+        state.planner_skips += 1;
+        console.log(JSON.stringify({
+          event: "heartbeat_pressure_skip",
+          trigger,
+          lane,
+          worker_ms: worker.ms,
+          threshold_ms: PRESSURE_LATENCY_MS,
+        }));
+        state.last_ok = true;
+        return;
+      }
+    }
+
+    // All production lanes were idle and healthy. Planner is allowed only on
+    // a slower cadence so planning can never become the hot path.
+    const nowMs = Date.now();
+    const lastPlannerMs = state.last_planner_attempt_at
+      ? Date.parse(state.last_planner_attempt_at)
+      : 0;
+    const plannerDue =
+      !lastPlannerMs ||
+      nowMs - lastPlannerMs >= PLANNER_MIN_INTERVAL_MS;
+
+    if (!plannerDue) {
+      state.planner_skips += 1;
+      console.log(JSON.stringify({
+        event: "planner_skip",
+        trigger,
+        reason: "planner_min_interval",
+        last_planner_attempt_at: state.last_planner_attempt_at,
+        min_interval_ms: PLANNER_MIN_INTERVAL_MS,
+      }));
       state.last_ok = true;
       return;
     }
 
-    if (!worker.ok) {
+    state.last_planner_attempt_at = new Date().toISOString();
+
+    const planner = await invoke("booked-solid-orchestrator", {
+      action: "plan",
+      limit: 1,
+      source: "render-heartbeat-v3",
+    }, 60000);
+
+    state.last_planner_status = planner.status;
+    state.last_planner_ms = planner.ms;
+    state.last_planner_queued = planner.data?.queued ?? null;
+
+    console.log(JSON.stringify({
+      event: "planner_probe",
+      trigger,
+      status: planner.status,
+      ms: planner.ms,
+      queued: state.last_planner_queued,
+      deferred: planner.data?.deferred ?? null,
+      reason: planner.data?.reason ?? null,
+    }));
+
+    if (!planner.ok && planner.status !== 202) {
       throw new Error(
-        `worker_http_${worker.status}:${JSON.stringify(worker.data).slice(0, 700)}`
+        `planner_http_${planner.status}:${JSON.stringify(planner.data).slice(0, 700)}`
       );
-    }
-
-    const workerIdle =
-      worker.data?.idle === true ||
-      Number(worker.data?.processed ?? 0) === 0;
-
-    if (workerIdle) {
-      const nowMs = Date.now();
-      const lastPlannerMs = state.last_planner_attempt_at
-        ? Date.parse(state.last_planner_attempt_at)
-        : 0;
-      const plannerDue =
-        !lastPlannerMs ||
-        nowMs - lastPlannerMs >= PLANNER_MIN_INTERVAL_MS;
-      const dbLooksHealthy =
-        worker.ms <= PLANNER_MAX_WORKER_IDLE_MS;
-
-      if (!dbLooksHealthy) {
-        state.planner_skips += 1;
-        console.log(JSON.stringify({
-          event: "planner_skip",
-          trigger,
-          reason: "worker_idle_latency_pressure",
-          worker_ms: worker.ms,
-          threshold_ms: PLANNER_MAX_WORKER_IDLE_MS,
-        }));
-        state.last_ok = true;
-        return;
-      }
-
-      if (!plannerDue) {
-        state.planner_skips += 1;
-        console.log(JSON.stringify({
-          event: "planner_skip",
-          trigger,
-          reason: "planner_min_interval",
-          last_planner_attempt_at: state.last_planner_attempt_at,
-          min_interval_ms: PLANNER_MIN_INTERVAL_MS,
-        }));
-        state.last_ok = true;
-        return;
-      }
-
-      state.last_planner_attempt_at = new Date().toISOString();
-
-      const planner = await invoke("booked-solid-orchestrator", {
-        action: "plan",
-        limit: 1,
-        source: "render-heartbeat-v2",
-      }, 60000);
-
-      state.last_planner_status = planner.status;
-      state.last_planner_ms = planner.ms;
-      state.last_planner_queued = planner.data?.queued ?? null;
-
-      console.log(JSON.stringify({
-        event: "planner_probe",
-        trigger,
-        status: planner.status,
-        ms: planner.ms,
-        queued: state.last_planner_queued,
-        deferred: planner.data?.deferred ?? null,
-        reason: planner.data?.reason ?? null,
-      }));
-
-      if (!planner.ok && planner.status !== 202) {
-        throw new Error(
-          `planner_http_${planner.status}:${JSON.stringify(planner.data).slice(0, 700)}`
-        );
-      }
     }
 
     state.last_ok = true;
@@ -215,11 +242,11 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       service: "solidos-heartbeat",
-      version: 2,
+      version: 3,
       in_flight: inFlight,
       heartbeat_ms: HEARTBEAT_MS,
       planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
-      planner_max_worker_idle_ms: PLANNER_MAX_WORKER_IDLE_MS,
+      pressure_latency_ms: PRESSURE_LATENCY_MS,
       state,
     }));
     return;
@@ -232,11 +259,11 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(JSON.stringify({
     event: "server_started",
-    version: 2,
+    version: 3,
     port: PORT,
     heartbeat_ms: HEARTBEAT_MS,
     planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
-    planner_max_worker_idle_ms: PLANNER_MAX_WORKER_IDLE_MS,
+    pressure_latency_ms: PRESSURE_LATENCY_MS,
   }));
 
   setTimeout(() => heartbeat("startup"), 2000);
