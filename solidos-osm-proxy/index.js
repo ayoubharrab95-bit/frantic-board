@@ -1,4 +1,4 @@
-const http = require("http");
+const http = require("http");\nconst dns = require("dns");\ndns.setDefaultResultOrder("ipv4first");
 
 const PORT = Number(process.env.PORT || 10000);
 const ENDPOINTS = [
@@ -42,7 +42,18 @@ async function tryOverpass(endpoint, query) {
       error: ok ? null : text.slice(0, 300)
     };
   } catch (e) {
-    return {ok:false, endpoint, status:0, latency_ms:Date.now()-started, error:String(e && e.message || e)};
+    return {
+      ok:false, endpoint, status:0, latency_ms:Date.now()-started,
+      error:String(e && e.message || e),
+      cause:e && e.cause ? {
+        message:String(e.cause.message||""),
+        code:e.cause.code||null,
+        errno:e.cause.errno||null,
+        syscall:e.cause.syscall||null,
+        address:e.cause.address||null,
+        port:e.cause.port||null
+      } : null
+    };
   } finally {
     clearTimeout(timer);
   }
