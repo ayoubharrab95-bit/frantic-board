@@ -1,0 +1,79 @@
+name: SolidOS Heartbeat
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: solidos-heartbeat
+  cancel-in-progress: false
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      SUPABASE_URL: https://btubdaoqqhmxemcbstrd.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_md4XvWG9RgkKYnlK1AN04Q_IFZhFoHl
+
+    steps:
+      - name: Kick worker, plan if idle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          call_edge() {
+            local slug="$1"
+            local body="$2"
+            local max_time="$3"
+            local out_file="$4"
+
+            local code
+            code="$(
+              curl -sS                 --max-time "$max_time"                 -o "$out_file"                 -w "%{http_code}"                 -X POST "$SUPABASE_URL/functions/v1/$slug"                 -H "Content-Type: application/json"                 -H "apikey: $SUPABASE_PUBLISHABLE_KEY"                 -H "Authorization: Bearer $SUPABASE_PUBLISHABLE_KEY"                 --data "$body"
+            )"
+
+            echo "$code"
+          }
+
+          WORKER_CODE="$(
+            call_edge               "booked-solid-worker"               '{"source":"github-actions-heartbeat-v1","batch_size":1,"lane":"auto","maintenance":false}'               "175"               "worker.json"
+          )"
+
+          echo "worker_http=$WORKER_CODE"
+          cat worker.json || true
+          echo
+
+          if [ "$WORKER_CODE" = "202" ]; then
+            echo "worker already active; heartbeat complete"
+            exit 0
+          fi
+
+          if [ "$WORKER_CODE" != "200" ]; then
+            echo "worker heartbeat failed"
+            exit 1
+          fi
+
+          WORKER_IDLE="$(jq -r '.idle // false' worker.json 2>/dev/null || echo false)"
+          WORKER_PROCESSED="$(jq -r '.processed // 0' worker.json 2>/dev/null || echo 0)"
+
+          if [ "$WORKER_IDLE" = "true" ] || [ "$WORKER_PROCESSED" = "0" ]; then
+            PLANNER_CODE="$(
+              call_edge                 "booked-solid-orchestrator"                 '{"action":"plan","limit":2,"source":"github-actions-heartbeat-v1"}'                 "145"                 "planner.json"
+            )"
+
+            echo "planner_http=$PLANNER_CODE"
+            cat planner.json || true
+            echo
+
+            if [ "$PLANNER_CODE" != "200" ] && [ "$PLANNER_CODE" != "202" ]; then
+              echo "planner heartbeat failed"
+              exit 1
+            fi
+          else
+            echo "worker processed due work; v179 self-chain continues"
+          fi
