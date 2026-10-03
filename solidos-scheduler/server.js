@@ -1,0 +1,202 @@
+const http = require("http");
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+const PORT = Number(process.env.PORT || 10000);
+const HEARTBEAT_MS = Math.max(60000, Number(process.env.HEARTBEAT_MS || 180000));
+
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error("missing_scheduler_env");
+  process.exit(2);
+}
+
+let inFlight = false;
+let state = {
+  started_at: new Date().toISOString(),
+  last_run_at: null,
+  last_completed_at: null,
+  last_ok: null,
+  last_worker_status: null,
+  last_worker_ms: null,
+  last_worker_processed: null,
+  last_worker_idle: null,
+  last_planner_status: null,
+  last_planner_ms: null,
+  last_planner_queued: null,
+  last_error: null,
+  runs: 0,
+};
+
+async function invoke(slug, body, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/${slug}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_PUBLISHABLE_KEY,
+        "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = { raw: text.slice(0, 1000) };
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      ms: Date.now() - started,
+      data,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function heartbeat(trigger = "timer") {
+  if (inFlight) {
+    console.log(JSON.stringify({ event: "heartbeat_skip", reason: "in_flight", trigger }));
+    return;
+  }
+
+  inFlight = true;
+  state.last_run_at = new Date().toISOString();
+  state.runs += 1;
+  state.last_error = null;
+
+  try {
+    const worker = await invoke("booked-solid-worker", {
+      source: "render-heartbeat-v1",
+      batch_size: 1,
+      lane: "auto",
+      maintenance: false,
+    }, 175000);
+
+    state.last_worker_status = worker.status;
+    state.last_worker_ms = worker.ms;
+    state.last_worker_processed = worker.data?.processed ?? null;
+    state.last_worker_idle = worker.data?.idle ?? null;
+
+    console.log(JSON.stringify({
+      event: "worker_probe",
+      trigger,
+      status: worker.status,
+      ms: worker.ms,
+      processed: state.last_worker_processed,
+      idle: state.last_worker_idle,
+      deferred: worker.data?.deferred ?? null,
+      reason: worker.data?.reason ?? null,
+    }));
+
+    // 202 = another worker owns the global lease. Production is already moving.
+    if (worker.status === 202) {
+      state.last_ok = true;
+      return;
+    }
+
+    if (!worker.ok) {
+      throw new Error(`worker_http_${worker.status}:${JSON.stringify(worker.data).slice(0, 700)}`);
+    }
+
+    // Worker v179 self-chains while due work remains.
+    // Only ask the planner for fresh work when heartbeat found the queue idle.
+    if (worker.data?.idle === true || Number(worker.data?.processed ?? 0) === 0) {
+      const planner = await invoke("booked-solid-orchestrator", {
+        action: "plan",
+        limit: 2,
+        source: "render-heartbeat-v1",
+      }, 145000);
+
+      state.last_planner_status = planner.status;
+      state.last_planner_ms = planner.ms;
+      state.last_planner_queued = planner.data?.queued ?? null;
+
+      console.log(JSON.stringify({
+        event: "planner_probe",
+        trigger,
+        status: planner.status,
+        ms: planner.ms,
+        queued: state.last_planner_queued,
+        deferred: planner.data?.deferred ?? null,
+        reason: planner.data?.reason ?? null,
+      }));
+
+      if (!planner.ok && planner.status !== 202) {
+        throw new Error(`planner_http_${planner.status}:${JSON.stringify(planner.data).slice(0, 700)}`);
+      }
+    }
+
+    state.last_ok = true;
+  } catch (error) {
+    state.last_ok = false;
+    state.last_error = error?.message || String(error);
+    console.error(JSON.stringify({
+      event: "heartbeat_error",
+      trigger,
+      error: state.last_error,
+    }));
+  } finally {
+    state.last_completed_at = new Date().toISOString();
+    inFlight = false;
+  }
+}
+
+const server = http.createServer((req, res) => {
+  if (req.url === "/health" || req.url === "/") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      ok: true,
+      service: "solidos-heartbeat",
+      in_flight: inFlight,
+      heartbeat_ms: HEARTBEAT_MS,
+      state,
+    }));
+    return;
+  }
+
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ ok: false, error: "not_found" }));
+});
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(JSON.stringify({
+    event: "server_started",
+    port: PORT,
+    heartbeat_ms: HEARTBEAT_MS,
+  }));
+
+  setTimeout(() => heartbeat("startup"), 2000);
+});
+
+setInterval(() => heartbeat("timer"), HEARTBEAT_MS);
+
+// Keep a free Render web service active with a normal inbound health request.
+// Render exposes RENDER_EXTERNAL_HOSTNAME on web services; SELF_URL is a fallback override.
+const selfUrl = process.env.SELF_URL
+  || (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
+
+if (selfUrl) {
+  setInterval(async () => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      await fetch(`${selfUrl}/health`, { signal: controller.signal });
+      clearTimeout(timer);
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: "self_ping_error",
+        error: error?.message || String(error),
+      }));
+    }
+  }, 8 * 60 * 1000);
+}
