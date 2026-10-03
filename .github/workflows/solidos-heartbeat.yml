@@ -1,6 +1,10 @@
 name: SolidOS Heartbeat
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/solidos-heartbeat.yml"
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
