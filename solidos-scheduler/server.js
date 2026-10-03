@@ -4,6 +4,14 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 const PORT = Number(process.env.PORT || 10000);
 const HEARTBEAT_MS = Math.max(60000, Number(process.env.HEARTBEAT_MS || 180000));
+const PLANNER_MIN_INTERVAL_MS = Math.max(
+  180000,
+  Number(process.env.PLANNER_MIN_INTERVAL_MS || 360000)
+);
+const PLANNER_MAX_WORKER_IDLE_MS = Math.max(
+  1000,
+  Number(process.env.PLANNER_MAX_WORKER_IDLE_MS || 5000)
+);
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.error("missing_scheduler_env");
@@ -23,6 +31,8 @@ let state = {
   last_planner_status: null,
   last_planner_ms: null,
   last_planner_queued: null,
+  last_planner_attempt_at: null,
+  planner_skips: 0,
   last_error: null,
   runs: 0,
 };
@@ -65,7 +75,11 @@ async function invoke(slug, body, timeoutMs) {
 
 async function heartbeat(trigger = "timer") {
   if (inFlight) {
-    console.log(JSON.stringify({ event: "heartbeat_skip", reason: "in_flight", trigger }));
+    console.log(JSON.stringify({
+      event: "heartbeat_skip",
+      reason: "in_flight",
+      trigger,
+    }));
     return;
   }
 
@@ -76,11 +90,11 @@ async function heartbeat(trigger = "timer") {
 
   try {
     const worker = await invoke("booked-solid-worker", {
-      source: "render-heartbeat-v1",
+      source: "render-heartbeat-v2",
       batch_size: 1,
       lane: "auto",
       maintenance: false,
-    }, 175000);
+    }, 90000);
 
     state.last_worker_status = worker.status;
     state.last_worker_ms = worker.ms;
@@ -98,24 +112,66 @@ async function heartbeat(trigger = "timer") {
       reason: worker.data?.reason ?? null,
     }));
 
-    // 202 = another worker owns the global lease. Production is already moving.
+    // Another worker owns the global lease: production is already moving.
     if (worker.status === 202) {
       state.last_ok = true;
       return;
     }
 
     if (!worker.ok) {
-      throw new Error(`worker_http_${worker.status}:${JSON.stringify(worker.data).slice(0, 700)}`);
+      throw new Error(
+        `worker_http_${worker.status}:${JSON.stringify(worker.data).slice(0, 700)}`
+      );
     }
 
-    // Worker v179 self-chains while due work remains.
-    // Only ask the planner for fresh work when heartbeat found the queue idle.
-    if (worker.data?.idle === true || Number(worker.data?.processed ?? 0) === 0) {
+    const workerIdle =
+      worker.data?.idle === true ||
+      Number(worker.data?.processed ?? 0) === 0;
+
+    if (workerIdle) {
+      const nowMs = Date.now();
+      const lastPlannerMs = state.last_planner_attempt_at
+        ? Date.parse(state.last_planner_attempt_at)
+        : 0;
+      const plannerDue =
+        !lastPlannerMs ||
+        nowMs - lastPlannerMs >= PLANNER_MIN_INTERVAL_MS;
+      const dbLooksHealthy =
+        worker.ms <= PLANNER_MAX_WORKER_IDLE_MS;
+
+      if (!dbLooksHealthy) {
+        state.planner_skips += 1;
+        console.log(JSON.stringify({
+          event: "planner_skip",
+          trigger,
+          reason: "worker_idle_latency_pressure",
+          worker_ms: worker.ms,
+          threshold_ms: PLANNER_MAX_WORKER_IDLE_MS,
+        }));
+        state.last_ok = true;
+        return;
+      }
+
+      if (!plannerDue) {
+        state.planner_skips += 1;
+        console.log(JSON.stringify({
+          event: "planner_skip",
+          trigger,
+          reason: "planner_min_interval",
+          last_planner_attempt_at: state.last_planner_attempt_at,
+          min_interval_ms: PLANNER_MIN_INTERVAL_MS,
+        }));
+        state.last_ok = true;
+        return;
+      }
+
+      state.last_planner_attempt_at = new Date().toISOString();
+
       const planner = await invoke("booked-solid-orchestrator", {
         action: "plan",
-        limit: 2,
-        source: "render-heartbeat-v1",
-      }, 145000);
+        limit: 1,
+        source: "render-heartbeat-v2",
+      }, 60000);
 
       state.last_planner_status = planner.status;
       state.last_planner_ms = planner.ms;
@@ -132,7 +188,9 @@ async function heartbeat(trigger = "timer") {
       }));
 
       if (!planner.ok && planner.status !== 202) {
-        throw new Error(`planner_http_${planner.status}:${JSON.stringify(planner.data).slice(0, 700)}`);
+        throw new Error(
+          `planner_http_${planner.status}:${JSON.stringify(planner.data).slice(0, 700)}`
+        );
       }
     }
 
@@ -157,8 +215,11 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       service: "solidos-heartbeat",
+      version: 2,
       in_flight: inFlight,
       heartbeat_ms: HEARTBEAT_MS,
+      planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
+      planner_max_worker_idle_ms: PLANNER_MAX_WORKER_IDLE_MS,
       state,
     }));
     return;
@@ -171,8 +232,11 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(JSON.stringify({
     event: "server_started",
+    version: 2,
     port: PORT,
     heartbeat_ms: HEARTBEAT_MS,
+    planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
+    planner_max_worker_idle_ms: PLANNER_MAX_WORKER_IDLE_MS,
   }));
 
   setTimeout(() => heartbeat("startup"), 2000);
@@ -180,23 +244,30 @@ server.listen(PORT, "0.0.0.0", () => {
 
 setInterval(() => heartbeat("timer"), HEARTBEAT_MS);
 
-// Keep a free Render web service active with a normal inbound health request.
-// Render exposes RENDER_EXTERNAL_HOSTNAME on web services; SELF_URL is a fallback override.
-const selfUrl = process.env.SELF_URL
-  || (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
+const selfUrl =
+  process.env.SELF_URL ||
+  (process.env.RENDER_EXTERNAL_HOSTNAME
+    ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}`
+    : null) ||
+  "https://solidos-heartbeat.onrender.com";
 
-if (selfUrl) {
-  setInterval(async () => {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-      await fetch(`${selfUrl}/health`, { signal: controller.signal });
-      clearTimeout(timer);
-    } catch (error) {
-      console.error(JSON.stringify({
-        event: "self_ping_error",
-        error: error?.message || String(error),
-      }));
-    }
-  }, 8 * 60 * 1000);
-}
+setInterval(async () => {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(`${selfUrl}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    console.log(JSON.stringify({
+      event: "self_ping_ok",
+      status: response.status,
+    }));
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "self_ping_error",
+      error: error?.message || String(error),
+    }));
+  }
+}, 8 * 60 * 1000);
