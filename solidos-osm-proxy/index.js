@@ -75,3 +75,8 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log("solidos-osm-proxy listening", {PORT});
 });
+
+setTimeout(() => {
+  probe().then(r => console.log("startup_probe", JSON.stringify(r)))
+    .catch(e => console.error("startup_probe_error", e));
+}, 1000);
