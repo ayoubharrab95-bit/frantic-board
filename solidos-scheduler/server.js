@@ -132,8 +132,64 @@ async function heartbeat(trigger = "timer") {
     for (const [lane, timeoutMs] of lanes) {
       const worker = await workerLane(lane, timeoutMs, trigger);
 
-      // Another worker already owns the lease; production is moving.
+      // Distinguish "another worker is active" from DB-preflight pressure.
+      // Only a real lease conflict means production is already moving.
       if (worker.status === 202) {
+        const reason = String(worker.data?.reason || "");
+        if (reason === "worker_lease_busy") {
+          state.last_ok = true;
+          return;
+        }
+
+        if (reason === "db_preflight_unavailable" || reason === "db_preflight_timeout") {
+          state.pressure_skips += 1;
+
+          const nowMs = Date.now();
+          const lastPlannerMs = state.last_planner_attempt_at
+            ? Date.parse(state.last_planner_attempt_at)
+            : 0;
+          const plannerDue =
+            !lastPlannerMs ||
+            nowMs - lastPlannerMs >= PLANNER_MIN_INTERVAL_MS;
+
+          // Recovery pulse: do not let transient DB preflight pressure starve
+          // discovery forever. At most once per planner interval, try a tiny
+          // plan cycle that can seed fresh Discovery/Research work.
+          if (plannerDue) {
+            state.last_planner_attempt_at = new Date().toISOString();
+            const planner = await invoke("booked-solid-orchestrator", {
+              action: "plan",
+              limit: 1,
+              source: "render-heartbeat-v4-recovery",
+            }, 60000);
+
+            state.last_planner_status = planner.status;
+            state.last_planner_ms = planner.ms;
+            state.last_planner_queued = planner.data?.queued ?? null;
+
+            console.log(JSON.stringify({
+              event: "planner_recovery_probe",
+              trigger,
+              lane,
+              status: planner.status,
+              ms: planner.ms,
+              queued: state.last_planner_queued,
+              reason: planner.data?.reason ?? null,
+            }));
+
+            if (!planner.ok && planner.status !== 202) {
+              throw new Error(
+                `planner_recovery_http_${planner.status}:${JSON.stringify(planner.data).slice(0, 700)}`
+              );
+            }
+          } else {
+            state.planner_skips += 1;
+          }
+
+          state.last_ok = true;
+          return;
+        }
+
         state.last_ok = true;
         return;
       }
@@ -242,7 +298,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       service: "solidos-heartbeat",
-      version: 3,
+      version: 4,
       in_flight: inFlight,
       heartbeat_ms: HEARTBEAT_MS,
       planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
@@ -259,7 +315,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(JSON.stringify({
     event: "server_started",
-    version: 3,
+    version: 4,
     port: PORT,
     heartbeat_ms: HEARTBEAT_MS,
     planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
