@@ -150,7 +150,7 @@ async function heartbeat(trigger = "timer") {
             : 0;
           const plannerDue =
             !lastPlannerMs ||
-            nowMs - lastPlannerMs >= PLANNER_MIN_INTERVAL_MS;
+            nowMs - lastPlannerMs >= Math.max(0, PLANNER_MIN_INTERVAL_MS - 5000);
 
           // Recovery pulse: do not let transient DB preflight pressure starve
           // discovery forever. At most once per planner interval, try a tiny
@@ -234,7 +234,7 @@ async function heartbeat(trigger = "timer") {
       : 0;
     const plannerDue =
       !lastPlannerMs ||
-      nowMs - lastPlannerMs >= PLANNER_MIN_INTERVAL_MS;
+      nowMs - lastPlannerMs >= Math.max(0, PLANNER_MIN_INTERVAL_MS - 5000);
 
     if (!plannerDue) {
       state.planner_skips += 1;
@@ -298,7 +298,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       service: "solidos-heartbeat",
-      version: 6,
+      version: 7,
       in_flight: inFlight,
       heartbeat_ms: HEARTBEAT_MS,
       planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
@@ -315,7 +315,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(JSON.stringify({
     event: "server_started",
-    version: 6,
+    version: 7,
     port: PORT,
     heartbeat_ms: HEARTBEAT_MS,
     planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
