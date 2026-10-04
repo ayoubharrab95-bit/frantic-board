@@ -159,7 +159,7 @@ async function heartbeat(trigger = "timer") {
             state.last_planner_attempt_at = new Date().toISOString();
             const planner = await invoke("booked-solid-orchestrator", {
               action: "plan",
-              limit: 1,
+              limit: 2,
               source: "render-heartbeat-v4-recovery",
             }, 60000);
 
@@ -253,7 +253,7 @@ async function heartbeat(trigger = "timer") {
 
     const planner = await invoke("booked-solid-orchestrator", {
       action: "plan",
-      limit: 1,
+      limit: 2,
       source: "render-heartbeat-v3",
     }, 60000);
 
@@ -298,7 +298,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       service: "solidos-heartbeat",
-      version: 5,
+      version: 6,
       in_flight: inFlight,
       heartbeat_ms: HEARTBEAT_MS,
       planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
@@ -315,7 +315,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(JSON.stringify({
     event: "server_started",
-    version: 5,
+    version: 6,
     port: PORT,
     heartbeat_ms: HEARTBEAT_MS,
     planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
