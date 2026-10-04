@@ -3,10 +3,10 @@ const http = require("http");
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 const PORT = Number(process.env.PORT || 10000);
-const HEARTBEAT_MS = Math.max(60000, Number(process.env.HEARTBEAT_MS || 180000));
+const HEARTBEAT_MS = Math.max(60000, Number(process.env.HEARTBEAT_MS || 120000));
 const PLANNER_MIN_INTERVAL_MS = Math.max(
   180000,
-  Number(process.env.PLANNER_MIN_INTERVAL_MS || 360000)
+  Number(process.env.PLANNER_MIN_INTERVAL_MS || 240000)
 );
 const PRESSURE_LATENCY_MS = Math.max(
   1000,
@@ -298,7 +298,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({
       ok: true,
       service: "solidos-heartbeat",
-      version: 4,
+      version: 5,
       in_flight: inFlight,
       heartbeat_ms: HEARTBEAT_MS,
       planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
@@ -315,7 +315,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(JSON.stringify({
     event: "server_started",
-    version: 4,
+    version: 5,
     port: PORT,
     heartbeat_ms: HEARTBEAT_MS,
     planner_min_interval_ms: PLANNER_MIN_INTERVAL_MS,
